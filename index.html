@@ -193,7 +193,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:1
 <div class="login-screen" id="loginScreen" style="display:none">
   <div class="login-icon">🧩</div>
   <div class="login-title">AGU — Bloco Complementar</div>
-  <div class="login-sub">14 disciplinas do edital AGU 2022 — exclusivas e transferíveis<br>Trilha subordinada ao ciclo TRT9</div>
+  <div class="login-sub">14 disciplinas do edital AGU 2022<br>Motor principal · TRT9 pausado</div>
   <button class="btn-google" onclick="loginGoogle()">
     <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg">
     Entrar com Google
@@ -203,7 +203,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:1
 <div id="appScreen" style="display:none">
 <div class="nav">
   <div class="nav-top">
-    <div><div class="nav-title">AGU — Complementar</div><div class="nav-sub">Subordinado ao TRT9 · sem edital publicado</div></div>
+    <div><div class="nav-title">AGU — Motor Principal</div><div class="nav-sub">TRT9 pausado · decisão de 27/06/2026</div></div>
     <div class="nav-right">
       <div class="nav-user" id="navUser"></div>
       <div class="nav-actions">
@@ -225,7 +225,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:1
 </nav>
 
 <div class="page active" id="page-dashboard">
-  <div class="subordinate-banner"><span class="ic">🔒</span><div>Trilha <strong>complementar</strong> e <strong>subordinada</strong> ao TRT9. O ritmo do TRT9 nunca é reduzido por causa deste bloco. Todas as 14 disciplinas do edital AGU 2022 estão aqui — as <span class="cat-badge cat-transfere" style="vertical-align:1px">TRANSFEREM</span> são só pra checar se o ângulo é diferente do TRT9, controle individualmente o quanto estuda cada uma. Checkpoint de reavaliação: <strong>outubro/2026</strong> (ou edital publicado da AGU com prazo de prova).</div></div>
+  <div class="subordinate-banner"><span class="ic">🎯</span><div><strong>AGU é o motor principal agora.</strong> Decisão deliberada de 27/06/2026 — TRT9 está pausado (não em manutenção), sem checkpoint automático de retomada. As 14 disciplinas do edital estão todas aqui; os badges <span class="cat-badge cat-transfere" style="vertical-align:1px">TRANSFEREM</span>/<span class="cat-badge cat-exclusiva" style="vertical-align:1px">EXCLUSIVA</span> são só informativos agora — pode estudar qualquer uma em profundidade.</div></div>
   <div class="card" style="background:linear-gradient(135deg,var(--surface) 0%,var(--surface2) 100%);">
     <div class="dash-hero">
       <div class="dash-kpi-row">
@@ -239,7 +239,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:1
     </div>
   </div>
   <div class="card">
-    <div class="card-title">⏱ Teto Diário do Bloco AGU</div>
+    <div class="card-title">📅 Meta Semanal de Estudo</div>
     <div class="ceiling-wrap">
       <svg class="ceiling-ring-svg" viewBox="0 0 84 84">
         <circle cx="42" cy="42" r="34" fill="none" stroke="var(--border)" stroke-width="9"/>
@@ -252,13 +252,19 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:1
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:8px;margin-top:14px">
-      <div class="field" style="margin:0;flex:1"><label>Teto diário (min, 30–45 recomendado)</label><input type="number" id="teto-input" min="15" max="90" step="5" value="40"></div>
-      <button class="btn btn-sm btn-ghost" onclick="atualizarTeto()" style="margin-top:18px;white-space:nowrap">Salvar</button>
+      <div class="field" style="margin:0;flex:1"><label>Meta semanal (horas)</label><input type="number" id="meta-input" min="1" max="80" step="1" value="30"></div>
+      <button class="btn btn-sm btn-ghost" onclick="atualizarMeta()" style="margin-top:18px;white-space:nowrap">Salvar</button>
     </div>
   </div>
   <div id="backlog-alert-card"></div>
   <div class="card">
-    <div class="card-title">📅 Histórico — Últimos 14 dias (min/dia vs. teto)</div>
+    <div class="card-title">🎯 Prova Objetiva — Grupos I / II / III</div>
+    <p style="font-size:.68rem;color:var(--muted);margin-bottom:12px;line-height:1.7">Corte real do edital: <strong>50% por grupo, não cumulativo</strong> — falhar em um grupo elimina mesmo com nota geral alta. Estimativa baseada no seu % de acerto em questões registradas; não substitui simulado real.</p>
+    <div id="grupos-panel"></div>
+    <div id="nota-estimada-box" style="margin-top:12px;font-size:.74rem;color:var(--text2);background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;line-height:1.7"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">📈 Histórico — Últimos 14 dias (min/dia vs. média da meta)</div>
     <div id="dash-semanas" style="display:flex;gap:5px;align-items:flex-end"></div>
   </div>
   <div class="card">
@@ -300,7 +306,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:1
         </label>
       </div>
     </div>
-    <div id="ceiling-warning-box"></div>
     <button class="btn" onclick="registrarSessao()">Registrar sessão →</button>
   </div>
 </div>
@@ -323,7 +328,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:1
   </div>
   <div class="card">
     <div class="card-title">📚 Progresso por Disciplina e Subtópico</div>
-    <p style="font-size:.68rem;color:var(--muted);margin-bottom:10px;line-height:1.7"><span class="cat-badge cat-exclusiva">EXCLUSIVA</span> = não cai no TRT9, é o motivo deste bloco existir. <span class="cat-badge cat-transfere">TRANSFERE</span> = já é coberta pelo ciclo TRT9 — aqui é só pra checar se a AGU cobra um ângulo diferente, não pra abrir trilha paralela.</p>
+    <p style="font-size:.68rem;color:var(--muted);margin-bottom:10px;line-height:1.7"><span class="cat-badge cat-exclusiva">EXCLUSIVA</span> = não cai no TRT9. <span class="cat-badge cat-transfere">TRANSFERE</span> = também cai no TRT9 (pausado). Badges informativos de quando a AGU era complementar — agora pode estudar qualquer uma em profundidade.</p>
     <div class="cat-filtros">
       <button class="filtro-btn active" onclick="setCatFiltro('todas',this)">Todas</button>
       <button class="filtro-btn" onclick="setCatFiltro('exclusiva',this)">Exclusivas</button>
@@ -342,7 +347,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:1
 <div class="page" id="page-revisoes">
   <div class="card">
     <div class="card-title">🔁 Revisões Espaçadas (+7 / +30 / +90)</div>
-    <p style="font-size:.7rem;color:var(--muted);margin-bottom:10px">Revisão = questões + erros. Nunca releitura passiva. Revisões pendentes têm prioridade sobre matéria nova dentro do teto diário.</p>
+    <p style="font-size:.7rem;color:var(--muted);margin-bottom:10px">Revisão = questões + erros. Nunca releitura passiva. Revisões pendentes têm prioridade sobre matéria nova — backlog grande sinaliza pra frear conteúdo novo, mesmo com tempo disponível.</p>
     <div id="rev-list"></div>
   </div>
 </div>
@@ -359,18 +364,19 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:1
 
 <div class="modal-overlay" id="modalRegras" onclick="if(event.target===this)fecharRegras()">
   <div class="modal-box">
-    <h3>📋 Hierarquia TRT9 / AGU</h3>
+    <h3>📋 Status do plano — AGU motor principal</h3>
     <ul>
-      <li><strong>TRT9 é o motor principal</strong> e nunca é desacelerado por causa deste bloco.</li>
-      <li>As 14 disciplinas do edital AGU 2022 estão todas aqui. <span class="cat-badge cat-exclusiva">EXCLUSIVA</span> (Tributário, Internacional Público e Privado, Financeiro e Econômico, Empresarial, Ambiental, Legislação da AGU, Penal/Proc.Penal, Seguridade Social, Eleitoral) é o motivo real do bloco existir. <span class="cat-badge cat-transfere">TRANSFERE</span> (Constitucional, Administrativo, Civil, Proc. Civil, Trabalho/Proc.Trabalho) já é coberta pelo TRT9 — aqui é só pra checar se a AGU testa um recorte diferente, <strong>não</strong> para abrir trilha de estudo paralela. Controle individualmente o peso de cada uma.</li>
-      <li><strong>Teto diário: 30–45 min</strong>, cobrindo matéria nova + revisões somadas, de qualquer disciplina registrada neste app. Se as revisões pendentes já tomam o teto, a matéria nova espera.</li>
-      <li>Mesma lógica de sessão → questões → revisão espaçada (+7/+30/+90) do TRT9. Nada de estudo avulso sem registro.</li>
+      <li><strong>Decisão deliberada de 27/06/2026:</strong> AGU passou a ser o motor principal, pré e pós-edital. TRT9 está <strong>pausado</strong> — sem avanço de conteúdo novo nem cobrança de ritmo, sem checkpoint automático de retomada. Motivos: histórico de convocação muito além das vagas iniciais (3,6x em 2022), remuneração + honorários + jornada regulamentada superiores, e volume de conteúdo maior que exige começar mais cedo.</li>
+      <li>As 14 disciplinas do edital estão todas no app. Os badges <span class="cat-badge cat-exclusiva">EXCLUSIVA</span>/<span class="cat-badge cat-transfere">TRANSFERE</span> são só informativos agora (de quando a AGU era complementar) — pode estudar qualquer uma em profundidade, sem restrição.</li>
+      <li><strong>Meta semanal editável</strong> (padrão 30h) substitui o antigo teto diário de 30-45min — esse teto só fazia sentido quando a AGU era bloco complementar. Ajuste a meta conforme sua disponibilidade real.</li>
+      <li><strong>Painel de Grupos (I/II/III)</strong> reflete o corte real da prova objetiva do edital 2022: 50% por grupo, não cumulativo — falhar em um grupo elimina mesmo com nota geral alta. A estimativa de nota usa seu % de acerto real em questões registradas.</li>
+      <li>Mesma lógica de sessão → questões → revisão espaçada (+7/+30/+90). Nada de estudo avulso sem registro — revisão é questão-primeiro, nunca releitura passiva.</li>
       <li>Sem cronograma externo de cursinho — só extração de módulos de conteúdo, no seu ritmo.</li>
       <li>Sem Caderno de Erros formal para este bloco por enquanto.</li>
-      <li><strong>Checkpoint:</strong> outubro/2026. Sem edital publicado da AGU (ou accuracy do TRT9 abaixo de 70%) → reduzir/pausar este bloco.</li>
+      <li>Se quiser retomar o TRT9 em algum momento (ex: edital TRT9 saindo com data próxima), trate como nova decisão deliberada a discutir — não é mais regra automática.</li>
     </ul>
     <div class="modal-sub">Lembrete de banca e conteúdo</div>
-    <p style="font-size:.7rem;color:var(--text2);line-height:1.7">Subtópicos baseados no edital real da AGU Advogado da União (2022, banca Cebraspe) — única referência oficial disponível. O concurso unificado de 2026 ainda não tem edital nem banca confirmada; o estilo pode divergir da literalidade da FCC — não misture os reflexos.</p>
+    <p style="font-size:.7rem;color:var(--text2);line-height:1.7">Subtópicos e estrutura de grupos baseados no edital real da AGU Advogado da União (2022, banca Cebraspe) — única referência oficial disponível até sair o edital do concurso unificado. Pode mudar pesos/grupos quando esse edital sair.</p>
     <button class="btn btn-ghost" onclick="fecharRegras()" style="margin-top:10px">Fechar</button>
   </div>
 </div>
@@ -451,9 +457,9 @@ function iniciarSync(uid){
       window._d.revisoes=d.revisoes||[];
       window._d.subTotais=d.subTotais||{};
       window._d.subTotaisPaginas=d.subTotaisPaginas||{};
-      window._d.tetoDiario=d.tetoDiario||40;
-      const tEl=document.getElementById('teto-input');
-      if(tEl)tEl.value=window._d.tetoDiario;
+      window._d.metaSemanal=d.metaSemanal||30;
+      const mEl=document.getElementById('meta-input');
+      if(mEl)mEl.value=window._d.metaSemanal;
     }
     setSyncStatus('✓ Sincronizado',true);
     render();
@@ -477,15 +483,14 @@ function setSyncStatus(msg,ok=false,err=false){
    banca Cebraspe) — única referência oficial disponível, já que o concurso unificado
    AGU/PGFN 2026 ainda não tem edital publicado. Revisar/expandir quando o edital do
    concurso unificado sair.
-   categoria 'transfere' = já cobrida pelo ciclo TRT9 (Constitucional, Administrativo,
-   Civil, Proc. Civil, Trabalho+Proc.Trabalho) — listada aqui só para checar se a AGU
-   testa um recorte/ângulo diferente, NÃO para abrir uma trilha de estudo paralela.
-   categoria 'exclusiva' = não é coberta pelo TRT9 — é o motivo real deste bloco existir.
-   Controle individualmente: o teto diário do bloco vale para qualquer sessão registrada
-   neste app, mas a leitura de "transfere" deve ser pontual (conferir subtópico, não virar
-   trilha nova). */
+   categoria 'transfere'/'exclusiva' = resquício de quando a AGU era bloco complementar
+   ao TRT9 (Constitucional, Administrativo, Civil, Proc. Civil, Trabalho+Proc.Trabalho
+   transferiam do TRT9). Hoje (TRT9 pausado, AGU motor principal) é só informativo —
+   pode estudar qualquer disciplina em profundidade, sem distinção de prioridade.
+   grupo 'I'/'II'/'III' = corte real da prova objetiva do edital (50% por grupo,
+   não cumulativo) — usado no painel de Grupos do Dashboard. */
 const DISC={
-  "Direito Tributário":{cor:"#5aa9d6",categoria:"exclusiva",subs:[
+  "Direito Tributário":{cor:"#5aa9d6",categoria:"exclusiva",grupo:"I",subs:[
     "Sistema Tributário Nacional — princípios gerais e limitações ao poder de tributar",
     "Direito tributário — conceito e princípios",
     "Tributos — conceito e espécies (impostos, taxas, contribuição de melhoria)",
@@ -502,7 +507,7 @@ const DISC={
     "Administração Tributária — fiscalização, sigilo fiscal, dívida ativa, certidões negativas",
     "Lei Complementar nº 118/2005"
   ]},
-  "Direito Internacional Público e Privado":{cor:"#86c4e8",categoria:"exclusiva",subs:[
+  "Direito Internacional Público e Privado":{cor:"#86c4e8",categoria:"exclusiva",grupo:"II",subs:[
     "Tratados — história, fontes, negociação e competência negocial",
     "Internalização e incorporação de tratados no Brasil; hierarquia; acordo executivo",
     "Costume internacional; entes de Direito Internacional (Estados, OIs, indivíduo)",
@@ -524,7 +529,7 @@ const DISC={
     "Auxílio direto; cooperação em matéria civil e penal; recuperação e partilha de ativos",
     "Sequestro internacional de crianças e exceções ao retorno"
   ]},
-  "Direito Financeiro e Econômico":{cor:"#4a8fc0",categoria:"exclusiva",subs:[
+  "Direito Financeiro e Econômico":{cor:"#4a8fc0",categoria:"exclusiva",grupo:"I",subs:[
     "Finanças públicas na CF/88 — normas gerais e orçamentos",
     "Orçamento — conceito, espécies, natureza jurídica, princípios orçamentários (Lei nº 4.320/1964)",
     "PPA, LDO, LOA — exercício financeiro e restos a pagar",
@@ -544,7 +549,7 @@ const DISC={
     "Intervenção do Estado no domínio econômico — liberalismo, intervencionismo, modalidades",
     "Lei nº 12.529/2011 — concorrência, infrações à ordem econômica, abuso de poder econômico"
   ]},
-  "Direito Empresarial":{cor:"#3f7aa8",categoria:"exclusiva",subs:[
+  "Direito Empresarial":{cor:"#3f7aa8",categoria:"exclusiva",grupo:"II",subs:[
     "Evolução — atos de comércio à atividade empresarial (teoria da empresa)",
     "O empresário — individual, EIRELI, sociedades empresárias, empresário rural",
     "Registro de empresas — órgãos, atos, manutenção e inatividade",
@@ -557,7 +562,7 @@ const DISC={
     "Lei das S.A. (Lei nº 6.404/1976)",
     "Falência e Recuperação de Empresas — intervenção e liquidação extrajudicial"
   ]},
-  "Direito Ambiental":{cor:"#5a9a5a",categoria:"exclusiva",subs:[
+  "Direito Ambiental":{cor:"#5a9a5a",categoria:"exclusiva",grupo:"I",subs:[
     "Princípios do Direito Ambiental",
     "A Constituição Federal e o meio ambiente",
     "Repartição de competências em matéria ambiental; normas de cooperação",
@@ -570,7 +575,7 @@ const DISC={
     "Áreas de preservação permanente e unidades de conservação",
     "Crimes contra o meio ambiente"
   ]},
-  "Legislação da AGU, Gestão de Conflitos e Governança":{cor:"#7a7a9a",categoria:"exclusiva",subs:[
+  "Legislação da AGU, Gestão de Conflitos e Governança":{cor:"#7a7a9a",categoria:"exclusiva",grupo:"I",subs:[
     "AGU — competências constitucionais, histórico, LC 73/1993, organização, órgãos e competências",
     "Advogado-Geral da União — provimento e competências",
     "Consultoria e assessoramento jurídico ao Poder Executivo; diferença consultoria vs. assessoramento",
@@ -586,7 +591,7 @@ const DISC={
     "Governança corporativa na AGU/PGF — Portaria Normativa AGU nº 46/2022",
     "Conflito de interesses no Poder Executivo federal (Lei 12.813/2013)"
   ]},
-  "Direito Penal e Direito Processual Penal":{cor:"#a85a7a",categoria:"exclusiva",subs:[
+  "Direito Penal e Direito Processual Penal":{cor:"#a85a7a",categoria:"exclusiva",grupo:"III",subs:[
     "Princípios do direito penal; aplicação da lei penal no tempo e no espaço",
     "Crime — conceito, classificação, teorias; fato típico, causalidade, tentativa/consumação; dolo e culpa",
     "Erro de tipo e de proibição; coação irresistível e obediência hierárquica",
@@ -603,7 +608,7 @@ const DISC={
     "Habeas corpus; busca e apreensão; interceptação telefônica (Lei 9.296/96)",
     "Cooperação internacional na investigação de crimes; Lei de Abuso de Autoridade"
   ]},
-  "Direito da Seguridade Social":{cor:"#5a9a8a",categoria:"exclusiva",subs:[
+  "Direito da Seguridade Social":{cor:"#5a9a8a",categoria:"exclusiva",grupo:"III",subs:[
     "Seguridade social — origem, evolução, conceito, princípios constitucionais; Reforma da Previdência (EC 103/2019)",
     "Regime Geral da Previdência Social — beneficiários, benefícios e custeio",
     "Salário de contribuição — parcelas, limites, reajustamento",
@@ -615,7 +620,7 @@ const DISC={
     "Previdência privada vs. pública",
     "Fundos de pensão"
   ]},
-  "Direito Eleitoral":{cor:"#9a8a3a",categoria:"exclusiva",subs:[
+  "Direito Eleitoral":{cor:"#9a8a3a",categoria:"exclusiva",grupo:"III",subs:[
     "Propaganda eleitoral — Código Eleitoral e Lei nº 9.504/1997",
     "Propaganda na imprensa, rádio, TV, internet e outros meios",
     "Condutas vedadas aos agentes públicos federais em eleições",
@@ -623,7 +628,7 @@ const DISC={
     "Abuso de poder e corrupção no processo eleitoral",
     "Jurisprudência dos tribunais superiores em matéria eleitoral"
   ]},
-  "Direito Constitucional":{cor:"#c97a3d",categoria:"transfere",subs:[
+  "Direito Constitucional":{cor:"#c97a3d",categoria:"transfere",grupo:"I",subs:[
     "História constitucional do Brasil; conceito, classificação e constitucionalismo (transnacional, neoconstitucionalismo)",
     "Normas constitucionais — classificação, eficácia dos direitos fundamentais, preâmbulo, normas programáticas, disposições transitórias",
     "Hermenêutica constitucional; princípios e regras; ponderação; poder constituinte",
@@ -645,7 +650,7 @@ const DISC={
     "Limitações constitucionais ao poder de tributar; ordem econômica e financeira; intervenção do Estado no domínio econômico",
     "Meio ambiente, populações indígenas e interesses difusos e coletivos na Constituição"
   ]},
-  "Direito Administrativo":{cor:"#b5654a",categoria:"transfere",subs:[
+  "Direito Administrativo":{cor:"#b5654a",categoria:"transfere",grupo:"I",subs:[
     "Conceito de direito administrativo, objeto e de Administração Pública (orgânico, formal, material); fontes",
     "Relação jurídico-administrativa; pessoa de direito público; teoria do órgão; classificação dos órgãos e funções",
     "Competência administrativa — distribuição, avocação, delegação; agente de fato; hierarquia e poder hierárquico",
@@ -669,7 +674,7 @@ const DISC={
     "Processo administrativo (Lei 9.784/1999); recursos e prescrição administrativa",
     "Lei de Acesso à Informação (LAI) e LGPD na Administração Pública"
   ]},
-  "Direito Civil":{cor:"#8a6fae",categoria:"transfere",subs:[
+  "Direito Civil":{cor:"#8a6fae",categoria:"transfere",grupo:"II",subs:[
     "Aplicação, interpretação e integração da lei; LINDB; distinção direito público/privado",
     "Pessoas naturais e jurídicas — capacidade, personalidade, domicílio",
     "Bens — classificações; bem de família",
@@ -686,7 +691,7 @@ const DISC={
     "Responsabilidade civil do fornecedor; por dano ambiental e a bens de valor artístico/histórico",
     "Registros públicos (Serp); Marco Civil da Internet"
   ]},
-  "Direito Processual Civil":{cor:"#6f5a96",categoria:"transfere",subs:[
+  "Direito Processual Civil":{cor:"#6f5a96",categoria:"transfere",grupo:"II",subs:[
     "Teoria geral do processo; sistema multiportas; desjudicialização e Fazenda Pública",
     "Fazenda Pública em juízo — prerrogativas e regras processuais diferenciadas",
     "Normas fundamentais do processo; limites da jurisdição nacional e cooperação internacional",
@@ -707,7 +712,7 @@ const DISC={
     "Juizado Especial Federal; suspensão de segurança; ações constitucionais (MS, HD, MI)",
     "Virtualização da Justiça — processo eletrônico, IA no Judiciário"
   ]},
-  "Direito do Trabalho e Direito Processual do Trabalho":{cor:"#4f8f6e",categoria:"transfere",subs:[
+  "Direito do Trabalho e Direito Processual do Trabalho":{cor:"#4f8f6e",categoria:"transfere",grupo:"III",subs:[
     "Princípios e fontes do direito do trabalho; renúncia e transação; comissões de conciliação prévia",
     "Relação de trabalho vs. relação de emprego; terceirização; sujeitos da relação de emprego, grupo de empresas",
     "Contrato individual de trabalho — modalidades e contratos afins; cooperativas",
@@ -759,7 +764,7 @@ function totalEstimadoGeral(){
   return {feito:tF,total:tT||1};
 }
 
-window._d={sessoes:[],revisoes:[],subTotais:{},subTotaisPaginas:{},tetoDiario:40};
+window._d={sessoes:[],revisoes:[],subTotais:{},subTotaisPaginas:{},metaSemanal:30};
 
 function hoje(){const n=new Date();return n.getFullYear()+'-'+String(n.getMonth()+1).padStart(2,'0')+'-'+String(n.getDate()).padStart(2,'0');}
 function fmtD(iso){if(!iso)return'';const[y,m,d]=iso.split('-');return d+'/'+m+'/'+y;}
@@ -829,92 +834,107 @@ window.mostrarInfoSub=function(){
   }
   content.innerHTML=html;
   box.style.display='block';
-  renderAvisoTeto();
 };
 
 window.toggleRevLabel=function(){
   const cb=document.getElementById('f-rev');
   const lbl=document.getElementById('toggle-rev-label');
-  setTimeout(()=>{ lbl.classList.toggle('checked', cb.checked); renderAvisoTeto(); }, 0);
+  setTimeout(()=>{ lbl.classList.toggle('checked', cb.checked); }, 0);
 };
 
-/* ── Governança do teto diário (30–45 min) ── */
+/* ── Meta semanal (editável, padrão 30h) — substitui o teto diário de
+   quando a AGU era trilha complementar. Agora é o motor principal, então
+   o limite é a disponibilidade real de tempo do Thiago, não um teto fixo. ── */
 function avgRevMin(){
   const revs=window._d.sessoes.filter(s=>s.rev);
-  if(revs.length===0)return 25; // estimativa padrão até haver histórico real
+  if(revs.length===0)return 25;
   return revs.reduce((a,s)=>a+horasSessao(s)*60,0)/revs.length;
-}
-function minutosHoje(){
-  return window._d.sessoes.filter(s=>s.data===hoje()).reduce((a,s)=>a+horasSessao(s)*60,0);
-}
-function pendentesHojeOuAtrasadas(){
-  return window._d.revisoes.filter(r=>!r.feita&&diasAte(r.data)<=0);
 }
 function atrasadas(){
   return window._d.revisoes.filter(r=>!r.feita&&diasAte(r.data)<0);
 }
-function statusTeto(){
-  const teto=window._d.tetoDiario||40;
-  const hojeMin=minutosHoje();
-  const pend=pendentesHojeOuAtrasadas();
-  const pendMin=pend.length*avgRevMin();
-  let nivel='ok', msg, detalhe;
-  if(hojeMin>=teto){
-    nivel='estourado';
-    msg='Teto do dia atingido';
-    detalhe=Math.round(hojeMin)+' min registrados / '+teto+' min de teto. Sem espaço para mais hoje.';
-  } else if(pendMin>=teto-hojeMin){
-    nivel='bloqueado';
-    msg='Revisões pendentes já tomam o teto de hoje';
-    detalhe=pend.length+' revisão(ões) pendente(s) ≈ '+Math.round(pendMin)+'min. Registre as revisões antes de matéria nova.';
-  } else {
-    nivel='ok';
-    const livre=Math.round(teto-hojeMin-pendMin);
-    msg='Livre para hoje';
-    detalhe='≈ '+Math.max(livre,0)+' min livres após cobrir revisões pendentes (~'+Math.round(pendMin)+'min) e o já registrado ('+Math.round(hojeMin)+'min).';
-  }
-  return {teto,hojeMin,pendMin,pendCount:pend.length,nivel,msg,detalhe};
+function inicioSemana(){
+  const d=new Date(); const dow=(d.getDay()+6)%7; // segunda=0
+  d.setDate(d.getDate()-dow); d.setHours(0,0,0,0);
+  return d;
 }
-function renderTeto(){
-  const st=statusTeto();
-  const pct=Math.min(100,Math.round((st.hojeMin/st.teto)*100));
-  const cor=st.nivel==='estourado'?'var(--danger)':st.nivel==='bloqueado'?'var(--warn)':'var(--success)';
+function horasSemanaAtual(){
+  const ini=inicioSemana();
+  return window._d.sessoes.filter(s=>{
+    const [y,m,dd]=s.data.split('-').map(Number);
+    return new Date(y,m-1,dd) >= ini;
+  }).reduce((a,s)=>a+horasSessao(s),0);
+}
+function renderMeta(){
+  const meta=window._d.metaSemanal||30;
+  const feitas=horasSemanaAtual();
+  const pct=Math.min(100,Math.round(feitas/meta*100));
+  const cor=pct>=100?'var(--success)':pct>=60?'var(--accent)':'var(--warn)';
   const circ=2*Math.PI*34;
   document.getElementById('ceiling-ring-fill').setAttribute('stroke',cor);
   document.getElementById('ceiling-ring-fill').setAttribute('stroke-dasharray',(pct/100*circ).toFixed(1)+' '+circ.toFixed(1));
   document.getElementById('ceiling-ring-txt').textContent=pct+'%';
-  document.getElementById('ceiling-status').textContent=(st.nivel==='estourado'?'🔴 ':st.nivel==='bloqueado'?'🟠 ':'🟢 ')+st.msg;
+  document.getElementById('ceiling-status').textContent=(pct>=100?'🟢 ':pct>=60?'🔵 ':'🟡 ')+feitas.toFixed(1)+'h de '+meta+'h esta semana';
   document.getElementById('ceiling-status').style.color=cor;
-  document.getElementById('ceiling-detail').textContent=st.detalhe;
+  document.getElementById('ceiling-detail').textContent=pct>=100?'Meta semanal batida! Pode ajustar pra cima se quiser manter o ritmo.':'Faltam '+(meta-feitas).toFixed(1)+'h pra bater a meta desta semana (seg–dom).';
 
   const atr=atrasadas();
   const backlogMin=atr.length*avgRevMin();
   const backlogCard=document.getElementById('backlog-alert-card');
-  if(backlogMin>st.teto*2 && atr.length>0){
-    backlogCard.innerHTML='<div class="card" style="border-color:rgba(224,82,82,.4);background:var(--danger-bg)"><div class="card-title" style="color:var(--danger)">⚠️ Backlog de revisões atrasadas</div><div style="font-size:.72rem;color:var(--text2);line-height:1.8">'+atr.length+' revisão(ões) atrasada(s), ≈ '+Math.round(backlogMin)+' min — mais que 2 dias de teto. Sugestão: pause novos subtópicos até reduzir esse backlog. Avise no próximo papo se isso persistir.</div></div>';
+  if(atr.length>=8){
+    backlogCard.innerHTML='<div class="card" style="border-color:rgba(224,82,82,.4);background:var(--danger-bg)"><div class="card-title" style="color:var(--danger)">⚠️ Backlog de revisões atrasadas</div><div style="font-size:.72rem;color:var(--text2);line-height:1.8">'+atr.length+' revisão(ões) atrasada(s), ≈ '+Math.round(backlogMin)+' min de trabalho acumulado. Mesmo com mais tempo disponível, revisão é questão-primeiro, não releitura — considere priorizar essas antes de abrir mais subtópicos novos.</div></div>';
   } else {
     backlogCard.innerHTML='';
   }
 }
-function renderAvisoTeto(){
-  const box=document.getElementById('ceiling-warning-box');
-  if(!box)return;
-  const isRev=document.getElementById('f-rev')?document.getElementById('f-rev').checked:false;
-  const st=statusTeto();
-  if(isRev){ box.innerHTML=''; return; }
-  if(st.nivel==='bloqueado'||st.nivel==='estourado'){
-    box.innerHTML='<div style="margin-top:10px;font-size:.68rem;color:var(--warn);background:var(--warn-bg);border:1px solid rgba(224,122,82,.25);border-radius:var(--radius-xs);padding:10px 12px;line-height:1.7">⚠️ '+st.detalhe+' Considere registrar as revisões pendentes antes de logar matéria nova.</div>';
-  } else {
-    box.innerHTML='';
-  }
-}
-window.atualizarTeto=async function(){
-  const v=parseInt(document.getElementById('teto-input').value)||40;
-  window._d.tetoDiario=Math.max(15,Math.min(90,v));
+window.atualizarMeta=async function(){
+  const v=parseInt(document.getElementById('meta-input').value)||30;
+  window._d.metaSemanal=Math.max(1,Math.min(80,v));
   await window._salvar();
   render();
-  showToast('✅ Teto diário atualizado!');
+  showToast('✅ Meta semanal atualizada!');
 };
+
+/* ── Painel de Grupos (I/II/III) — espelha o corte real da prova objetiva:
+   50% por grupo, não cumulativo. Estimativa baseada no % de acerto em
+   questões registradas nas disciplinas de cada grupo. ── */
+const GRUPO_QUESTOES={I:46,II:34,III:20};
+function statsGrupo(grupo){
+  const discs=DNAMES.filter(n=>DISC[n].grupo===grupo);
+  const sess=window._d.sessoes.filter(s=>discs.includes(s.disc));
+  const q=sess.reduce((a,s)=>a+(s.q||0),0);
+  const ac=sess.reduce((a,s)=>a+(s.ac||0),0);
+  const pct=q>0?Math.round(ac/q*100):null;
+  return {q,ac,pct,discs};
+}
+function renderGrupos(){
+  const cont=document.getElementById('grupos-panel');
+  if(!cont)return;
+  let notaEstimada=0, totalQ=0, temDados=false;
+  const html=['I','II','III'].map(g=>{
+    const st=statsGrupo(g);
+    const nq=GRUPO_QUESTOES[g];
+    totalQ+=nq;
+    if(st.pct!==null){ temDados=true; notaEstimada+=st.pct/100*nq; }
+    const pctShow=st.pct===null?'—':st.pct+'%';
+    const status=st.pct===null?{cor:'var(--muted)',ic:'⚪',lbl:'sem dados ainda'}
+      :st.pct<50?{cor:'var(--danger)',ic:'🔴',lbl:'eliminaria — abaixo do corte de 50%'}
+      :st.pct<65?{cor:'var(--warn)',ic:'🟡',lbl:'passa, mas abaixo da faixa histórica competitiva'}
+      :{cor:'var(--success)',ic:'🟢',lbl:'na faixa histórica competitiva (65–91%)'};
+    const barPct=st.pct||0;
+    return '<div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><div style="font-size:.74rem;font-weight:600">Grupo '+g+' <span style="color:var(--muted);font-weight:400">('+nq+'q — '+st.discs.length+' disciplinas)</span></div><div style="font-size:.74rem;font-weight:700;color:'+status.cor+'">'+pctShow+'</div></div><div class="bar"><div class="bar-fill" style="width:'+barPct+'%;background:'+status.cor+'"></div></div><div style="font-size:.6rem;color:'+status.cor+';margin-top:3px">'+status.ic+' '+status.lbl+' · '+st.ac+'/'+st.q+' questões</div></div>';
+  }).join('');
+  cont.innerHTML=html;
+  const box=document.getElementById('nota-estimada-box');
+  if(!temDados){
+    box.innerHTML='Ainda sem questões registradas pra estimar. Registre sessões com questões por disciplina pra essa estimativa aparecer.';
+  } else {
+    const notaRound=Math.round(notaEstimada);
+    const faixa=notaRound>=65?'dentro da faixa histórica de convocação (65–91 de 100)':notaRound>=50?'abaixo da faixa histórica, mas ainda sem reprovação por corte de grupo (se todos os grupos passarem de 50%)':'fora da faixa — revise o que está pesando antes de avançar conteúdo novo';
+    box.innerHTML='<strong>Nota estimada na objetiva hoje: '+notaRound+' / 100.</strong> '+faixa+'. Estimativa direcional (questões de estudo ≠ prova real) — não considera ainda o edital do concurso unificado, que pode mudar pesos/grupos.';
+  }
+}
+
 
 window.registrarSessao=async function(){
   const data=document.getElementById('f-data').value||hoje();
@@ -1071,7 +1091,7 @@ window.importarJSON=async function(evt){
       const d=JSON.parse(e.target.result); if(!d.sessoes)throw new Error();
       window._d.sessoes=d.sessoes||[]; window._d.revisoes=d.revisoes||[];
       window._d.subTotais=d.subTotais||{}; window._d.subTotaisPaginas=d.subTotaisPaginas||{};
-      window._d.tetoDiario=d.tetoDiario||40;
+      window._d.metaSemanal=d.metaSemanal||30;
       await window._salvar(); render(); showToast('✅ Importado!');
     }catch{ showToast('❌ Arquivo inválido','err'); }
   };
@@ -1104,7 +1124,8 @@ function renderDash(){
     const catBadge='<span class="cat-badge cat-'+cat+'">'+(cat==='exclusiva'?'EXCLUSIVA':'TRANSFERE')+'</span>';
     return '<div class="dash-disc-item"><div class="dash-disc-name">'+nome+' '+catBadge+'</div><div class="dash-disc-bar"><div class="dash-disc-bar-fill" style="width:'+pct+'%;background:'+DISC[nome].cor+'"></div></div><div class="dash-disc-pct">'+pct+'%</div></div>';
   }).join('');
-  renderTeto();
+  renderMeta();
+  renderGrupos();
   renderHistoricoDias();
 }
 function renderHistoricoDias(){
@@ -1113,15 +1134,15 @@ function renderHistoricoDias(){
     const d=new Date(); d.setDate(d.getDate()-i);
     dias.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'));
   }
-  const teto=window._d.tetoDiario||40;
+  const metaDia=(window._d.metaSemanal||30)*60/7;
   const minsPorDia=dias.map(iso=>window._d.sessoes.filter(s=>s.data===iso).reduce((a,s)=>a+horasSessao(s)*60,0));
-  const maxV=Math.max(teto,...minsPorDia,10);
+  const maxV=Math.max(metaDia,...minsPorDia,10);
   const cont=document.getElementById('dash-semanas');
   cont.innerHTML=dias.map((iso,idx)=>{
     const v=minsPorDia[idx];
     const h=Math.max(2,Math.round(v/maxV*60));
-    const linePos=Math.round(teto/maxV*60);
-    const cor=v>teto?'var(--danger)':v>0?'var(--accent)':'var(--border)';
+    const linePos=Math.round(metaDia/maxV*60);
+    const cor=v>=metaDia?'var(--success)':v>0?'var(--accent)':'var(--border)';
     const atual=iso===hoje()?' week-atual':'';
     const [,m,dd]=iso.split('-');
     return '<div class="week-bar-col'+atual+'" style="flex:1;min-width:0"><div class="week-bar-outer" style="height:64px"><div class="week-meta-line" style="bottom:'+linePos+'px"></div><div class="week-bar-fill" style="height:'+h+'px;background:'+cor+'"></div></div><div class="week-bar-val">'+(v>0?Math.round(v):'')+'</div><div class="week-bar-lbl">'+dd+'/'+m+'</div></div>';
@@ -1189,7 +1210,7 @@ function renderHistorico(filtro){
     return '<div class="hist-item'+(s.rev?' is-rev':'')+'"><div class="hist-top"><span class="hist-disc">'+s.disc+'</span><div style="display:flex;align-items:center;gap:6px">'+revBadge+'<span class="hist-date">'+fmtD(s.data)+'</span><button class="btn btn-sm btn-danger" onclick="deletarSessao('+s.id+')">✕</button></div></div><div class="hist-sub">'+s.sub+'</div><div class="hist-nums">'+bancaBadge+'<span>'+s.aulas+'aul</span>'+(s.paginas?'<span>'+s.paginas+'págs</span>':'')+'<span>'+s.q+'q</span>'+(pct!==null?'<span class="'+cls+'">'+pct+'% ('+s.ac+'/'+s.q+')</span>':'')+(s.obs?'<span style="color:var(--muted)">📝 '+s.obs+'</span>':'')+'</div></div>';
   }).join('');
 }
-function render(){ renderStats(); renderDash(); renderProgresso(); renderRevisoes(); renderHistorico(histFiltro); renderAvisoTeto(); }
+function render(){ renderStats(); renderDash(); renderProgresso(); renderRevisoes(); renderHistorico(histFiltro); }
 window.showPage=function(id,btn){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab-nav').forEach(t=>t.classList.remove('active'));
