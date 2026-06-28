@@ -181,6 +181,19 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:1
 .modal-box ul{margin:0 0 14px 0;padding-left:18px;}
 .modal-box li{font-size:.72rem;color:var(--text2);line-height:1.8;margin-bottom:6px;}
 .modal-box .modal-sub{font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin:14px 0 6px;}
+/* ── Multi-sub selector ── */
+.multisub-wrap{background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-xs);max-height:200px;overflow-y:auto;padding:4px 0;}
+.multisub-wrap.focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow);}
+.multisub-item{display:flex;align-items:flex-start;gap:8px;padding:7px 11px;cursor:pointer;transition:background .12s;}
+.multisub-item:hover{background:var(--surface3);}
+.multisub-item input[type=checkbox]{margin-top:2px;width:14px;height:14px;accent-color:var(--accent);flex-shrink:0;cursor:pointer;}
+.multisub-item label{font-size:.73rem;color:var(--text2);cursor:pointer;line-height:1.4;}
+.multisub-item.selected label{color:var(--text);}
+.multisub-placeholder{font-size:.73rem;color:var(--muted);padding:9px 11px;}
+.multisub-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px;min-height:0;}
+.multisub-tag{display:inline-flex;align-items:center;gap:4px;background:rgba(90,169,214,.15);border:1px solid rgba(90,169,214,.35);border-radius:99px;font-size:.6rem;color:var(--accent);padding:3px 8px;max-width:100%;word-break:break-word;}
+.multisub-tag .rm{cursor:pointer;font-size:.75rem;flex-shrink:0;opacity:.7;}
+.multisub-tag .rm:hover{opacity:1;}
 </style>
 </head>
 <body>
@@ -278,8 +291,14 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:1
     <div class="card-title">✏️ Registrar Sessão de Estudo</div>
     <div class="form-grid">
       <div class="field"><label>Data do estudo</label><input type="date" id="f-data"></div>
-      <div class="field"><label>Disciplina</label><select id="f-disc" onchange="popularSubs('f-sub','f-disc')"><option value="">Selecione...</option></select></div>
-      <div class="field field-full"><label>Subtópico</label><select id="f-sub" onchange="mostrarInfoSub()"><option value="">Selecione a disciplina primeiro</option></select></div>
+      <div class="field"><label>Disciplina</label><select id="f-disc" onchange="popularSubsMulti()"><option value="">Selecione...</option></select></div>
+      <div class="field field-full">
+        <label>Subtópico(s) <span style="color:var(--muted);font-size:.55rem">— selecione um ou mais</span></label>
+        <div class="multisub-wrap" id="f-sub-wrap">
+          <div class="multisub-placeholder" id="f-sub-placeholder">Selecione a disciplina primeiro</div>
+        </div>
+        <div class="multisub-tags" id="f-sub-tags"></div>
+      </div>
       <div class="field field-full" id="sub-info-box" style="display:none">
         <div id="sub-info-content" style="background:var(--surface3);border:1px solid var(--border2);border-radius:var(--radius-xs);padding:10px 12px;font-size:.7rem;color:var(--text2);line-height:1.7;"></div>
       </div>
@@ -994,44 +1013,117 @@ function popularTodosSelects(){
 }
 
 window.popularSubs=function(targetId,sourceId){
+  /* kept for edit-disc compatibility */
   const disc=document.getElementById(sourceId).value;
   const sel=document.getElementById(targetId);
+  if(!sel)return;
   sel.innerHTML='<option value="">Selecione o subtópico</option>';
   if(disc&&DISC[disc])DISC[disc].subs.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o);});
-  document.getElementById('sub-info-box').style.display='none';
+};
+
+/* ── Multi-subtópico ── */
+let _selectedSubs=[];
+
+window.popularSubsMulti=function(){
+  const disc=document.getElementById('f-disc').value;
+  const wrap=document.getElementById('f-sub-wrap');
+  const ph=document.getElementById('f-sub-placeholder');
+  _selectedSubs=[];
+  renderSubTags();
+  wrap.innerHTML='';
+  if(!disc||!DISC[disc]){
+    const p=document.createElement('div');
+    p.className='multisub-placeholder';
+    p.id='f-sub-placeholder';
+    p.textContent='Selecione a disciplina primeiro';
+    wrap.appendChild(p);
+    document.getElementById('sub-info-box').style.display='none';
+    document.getElementById('f-aulastotal').placeholder='Branco se já informou';
+    document.getElementById('f-paginastotal').placeholder='Branco se já informou';
+    return;
+  }
+  DISC[disc].subs.forEach((s,i)=>{
+    const id='msub_'+i;
+    const row=document.createElement('div');
+    row.className='multisub-item';
+    row.dataset.val=s;
+    const cb=document.createElement('input');
+    cb.type='checkbox'; cb.id=id; cb.value=s;
+    cb.addEventListener('change',()=>{
+      if(cb.checked){ if(!_selectedSubs.includes(s)) _selectedSubs.push(s); row.classList.add('selected'); }
+      else { _selectedSubs=_selectedSubs.filter(x=>x!==s); row.classList.remove('selected'); }
+      renderSubTags();
+      mostrarInfoSubMulti();
+    });
+    const lbl=document.createElement('label');
+    lbl.htmlFor=id; lbl.textContent=s;
+    row.addEventListener('click',e=>{ if(e.target!==cb){ cb.click(); } });
+    row.appendChild(cb); row.appendChild(lbl);
+    wrap.appendChild(row);
+  });
+};
+
+function renderSubTags(){
+  const container=document.getElementById('f-sub-tags');
+  container.innerHTML=_selectedSubs.map(s=>`<span class="multisub-tag"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${s}">${s}</span><span class="rm" onclick="removeSubTag(this,'${s.replace(/'/g,"\\'")}')">✕</span></span>`).join('');
+}
+
+window.removeSubTag=function(el,val){
+  _selectedSubs=_selectedSubs.filter(x=>x!==val);
+  const wrap=document.getElementById('f-sub-wrap');
+  wrap.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+    if(cb.value===val){ cb.checked=false; cb.closest('.multisub-item').classList.remove('selected'); }
+  });
+  renderSubTags();
+  mostrarInfoSubMulti();
 };
 
 window.mostrarInfoSub=function(){
-  const disc=document.getElementById('f-disc').value;
-  const sub=document.getElementById('f-sub').value;
-  const box=document.getElementById('sub-info-box');
-  const content=document.getElementById('sub-info-content');
-  if(!disc||!sub){box.style.display='none';return;}
-  const key=sk(disc,sub);
-  const totalAulas=window._d.subTotais[key]||0;
-  const totalPags=window._d.subTotaisPaginas?window._d.subTotaisPaginas[key]||0:0;
-  const aulasFeitas=window._d.sessoes.filter(s=>s.disc===disc&&s.sub===sub&&!s.rev).reduce((a,s)=>a+s.aulas,0);
-  const pagsFeitas=window._d.sessoes.filter(s=>s.disc===disc&&s.sub===sub&&!s.rev).reduce((a,s)=>a+(s.paginas||0),0);
-  const temRevisao=window._d.revisoes.some(r=>r.disc===disc&&r.sub===sub);
-  const fAulasTotal=document.getElementById('f-aulastotal');
-  const fPagsTotal=document.getElementById('f-paginastotal');
-  fAulasTotal.placeholder=totalAulas>0?'Atual: '+totalAulas+' aul':'Branco se já informou';
-  fPagsTotal.placeholder=totalPags>0?'Atual: '+totalPags+' pág':'Branco se já informou';
-  let html='';
-  if(aulasFeitas===0&&pagsFeitas===0&&totalAulas===0&&totalPags===0){
-    html='<span style="color:var(--muted)">○</span> <strong>Não iniciado</strong> — informe o total na 1ª sessão.';
-  } else if(totalAulas===0&&totalPags===0){
-    html='<span style="color:var(--accent)">⚠️</span> <strong>Em andamento sem total</strong>. Informe o total para ativar as revisões.';
-  } else if((totalAulas>0&&aulasFeitas>=totalAulas)||(totalPags>0&&pagsFeitas>=totalPags)){
-    html='<span style="color:var(--success)">✅</span> <strong>Concluído!</strong>'+(temRevisao?' Revisões agendadas.':' Sessão extra sem novo agendamento.');
-  } else if(totalAulas>0){
-    html='<span style="color:var(--accent)">⏳</span> <strong>Em andamento:</strong> '+aulasFeitas+'/'+totalAulas+' aulas — faltam <strong>'+(totalAulas-aulasFeitas)+'</strong>.';
-  } else {
-    html='<span style="color:var(--accent)">⏳</span> <strong>Em andamento:</strong> '+pagsFeitas+'/'+totalPags+' págs — faltam <strong>'+(totalPags-pagsFeitas)+'</strong>.';
-  }
-  content.innerHTML=html;
-  box.style.display='block';
+  mostrarInfoSubMulti();
 };
+
+function mostrarInfoSubMulti(){
+  const disc=document.getElementById('f-disc').value;
+  const box=document.getElementById('sub-info-box');
+  const contentEl=document.getElementById('sub-info-content');
+  if(!disc||_selectedSubs.length===0){box.style.display='none';return;}
+  /* Show info for each selected sub */
+  const lines=_selectedSubs.map(sub=>{
+    const key=sk(disc,sub);
+    const totalAulas=window._d.subTotais[key]||0;
+    const totalPags=window._d.subTotaisPaginas?window._d.subTotaisPaginas[key]||0:0;
+    const aulasFeitas=window._d.sessoes.filter(s=>s.disc===disc&&s.sub===sub&&!s.rev).reduce((a,s)=>a+s.aulas,0);
+    const pagsFeitas=window._d.sessoes.filter(s=>s.disc===disc&&s.sub===sub&&!s.rev).reduce((a,s)=>a+(s.paginas||0),0);
+    const temRevisao=window._d.revisoes.some(r=>r.disc===disc&&r.sub===sub);
+    let ic='', status='';
+    if(aulasFeitas===0&&pagsFeitas===0&&totalAulas===0&&totalPags===0){
+      ic='○'; status='Não iniciado';
+    } else if(totalAulas===0&&totalPags===0){
+      ic='⚠️'; status='Sem total definido';
+    } else if((totalAulas>0&&aulasFeitas>=totalAulas)||(totalPags>0&&pagsFeitas>=totalPags)){
+      ic='✅'; status='Concluído'+(temRevisao?' (revisões agendadas)':'');
+    } else if(totalAulas>0){
+      ic='⏳'; status=aulasFeitas+'/'+totalAulas+' aulas';
+    } else {
+      ic='⏳'; status=pagsFeitas+'/'+totalPags+' págs';
+    }
+    return '<div style="margin-bottom:4px">'+ic+' <strong style="font-size:.68rem">'+sub.slice(0,60)+(sub.length>60?'…':'')+'</strong> — '+status+'</div>';
+  });
+  /* Update placeholder for totals */
+  if(_selectedSubs.length===1){
+    const sub=_selectedSubs[0];
+    const key=sk(disc,sub);
+    const tA=window._d.subTotais[key]||0;
+    const tP=window._d.subTotaisPaginas?window._d.subTotaisPaginas[key]||0:0;
+    document.getElementById('f-aulastotal').placeholder=tA>0?'Atual: '+tA+' aul':'Branco se já informou';
+    document.getElementById('f-paginastotal').placeholder=tP>0?'Atual: '+tP+' pág':'Branco se já informou';
+  } else {
+    document.getElementById('f-aulastotal').placeholder='Branco se já informou';
+    document.getElementById('f-paginastotal').placeholder='Branco se já informou';
+  }
+  contentEl.innerHTML=lines.join('');
+  box.style.display='block';
+}
 
 window.toggleRevLabel=function(){
   const cb=document.getElementById('f-rev');
@@ -1136,7 +1228,7 @@ function renderGrupos(){
 window.registrarSessao=async function(){
   const data=document.getElementById('f-data').value||hoje();
   const disc=document.getElementById('f-disc').value;
-  const sub=document.getElementById('f-sub').value;
+  const subs=_selectedSubs.slice(); // copy of selected subtopics array
   const aulas=parseInt(document.getElementById('f-aulas').value)||0;
   const aulasTotal=parseInt(document.getElementById('f-aulastotal').value)||0;
   const paginas=parseInt(document.getElementById('f-paginas').value)||0;
@@ -1148,54 +1240,71 @@ window.registrarSessao=async function(){
   const rev=document.getElementById('f-rev').checked;
 
   if(!disc){showToast('Selecione a disciplina','err');return;}
-  if(!sub){showToast('Selecione o subtópico','err');return;}
+  if(subs.length===0){showToast('Selecione ao menos um subtópico','err');return;}
   if(aulas===0&&q===0&&paginas===0){showToast('Informe aulas, páginas ou questões','err');return;}
   if(ac>q){showToast('Acertos > questões','err');return;}
 
-  if(aulasTotal>0){ window._d.subTotais[sk(disc,sub)]=aulasTotal; delete window._d.subTotaisPaginas[sk(disc,sub)]; }
-  if(paginasTotal>0){ window._d.subTotaisPaginas[sk(disc,sub)]=paginasTotal; delete window._d.subTotais[sk(disc,sub)]; }
+  /* When multiple subs are selected, distribute aulas/paginas equally (rounded);
+     q/ac are shared across all — each sub gets a session with proportional values */
+  const n=subs.length;
+  const aulasPerSub=n>1?Math.round(aulas/n):aulas;
+  const paginasPerSub=n>1?Math.round(paginas/n):paginas;
+  const qPerSub=n>1?Math.round(q/n):q;
+  const acPerSub=n>1?Math.round(ac/n):ac;
 
-  const sessaoObj={id:Date.now(),data,disc,sub,aulas,paginas,q,ac,obs};
-  if(rev) sessaoObj.rev=true;
-  if(banca) sessaoObj.banca=banca;
-  window._d.sessoes.unshift(sessaoObj);
+  let concluidos=[], naoConc=[];
 
-  let _revAutoMarcada=null;
-  if(rev){
-    const pend=window._d.revisoes.filter(r=>r.disc===disc&&r.sub===sub&&!r.feita&&r.data<=data).sort((a,b)=>a.data.localeCompare(b.data));
-    if(pend.length>0){ pend[0].feita=true; _revAutoMarcada=pend[0]; }
-  }
+  subs.forEach((sub,idx)=>{
+    /* Update totals only when single sub (or first sub when multi, if user filled total) */
+    if(aulasTotal>0&&(n===1||idx===0)){ window._d.subTotais[sk(disc,sub)]=aulasTotal; delete window._d.subTotaisPaginas[sk(disc,sub)]; }
+    if(paginasTotal>0&&(n===1||idx===0)){ window._d.subTotaisPaginas[sk(disc,sub)]=paginasTotal; delete window._d.subTotais[sk(disc,sub)]; }
 
-  const key=sk(disc,sub);
-  const totalDefAulas=window._d.subTotais[key]||0;
-  const totalDefPags=window._d.subTotaisPaginas[key]||0;
-  const aulasFeitas=window._d.sessoes.filter(s=>s.disc===disc&&s.sub===sub&&!s.rev).reduce((a,s)=>a+s.aulas,0);
-  const pagsFeitas=window._d.sessoes.filter(s=>s.disc===disc&&s.sub===sub&&!s.rev).reduce((a,s)=>a+(s.paginas||0),0);
-  const jaTemRevisao=window._d.revisoes.some(r=>r.disc===disc&&r.sub===sub);
+    const sessaoObj={id:Date.now()+(idx*10),data,disc,sub,
+      aulas:aulasPerSub,paginas:paginasPerSub,q:qPerSub,ac:acPerSub,obs};
+    if(rev) sessaoObj.rev=true;
+    if(banca) sessaoObj.banca=banca;
+    window._d.sessoes.unshift(sessaoObj);
 
-  let concluido=false, msgFaltam='';
-  if(totalDefAulas>0&&aulasFeitas>=totalDefAulas) concluido=true;
-  if(totalDefPags>0&&pagsFeitas>=totalDefPags) concluido=true;
-  if(totalDefAulas>0&&!concluido) msgFaltam=`faltam ${totalDefAulas-aulasFeitas} aula(s)`;
-  else if(totalDefPags>0&&!concluido) msgFaltam=`faltam ${totalDefPags-pagsFeitas} pág(s)`;
+    if(rev){
+      const pend=window._d.revisoes.filter(r=>r.disc===disc&&r.sub===sub&&!r.feita&&r.data<=data).sort((a,b)=>a.data.localeCompare(b.data));
+      if(pend.length>0) pend[0].feita=true;
+    } else {
+      const key=sk(disc,sub);
+      const totalDefAulas=window._d.subTotais[key]||0;
+      const totalDefPags=window._d.subTotaisPaginas[key]||0;
+      const aulasFeitas=window._d.sessoes.filter(s=>s.disc===disc&&s.sub===sub&&!s.rev).reduce((a,s)=>a+s.aulas,0);
+      const pagsFeitas=window._d.sessoes.filter(s=>s.disc===disc&&s.sub===sub&&!s.rev).reduce((a,s)=>a+(s.paginas||0),0);
+      const jaTemRevisao=window._d.revisoes.some(r=>r.disc===disc&&r.sub===sub);
+      let concluido=false;
+      if(totalDefAulas>0&&aulasFeitas>=totalDefAulas) concluido=true;
+      if(totalDefPags>0&&pagsFeitas>=totalDefPags) concluido=true;
+      if(concluido&&!jaTemRevisao){ agendarRevisoes(disc,sub,data); concluidos.push(sub); }
+      else if(!concluido){ naoConc.push(sub); }
+    }
+  });
 
+  /* Toast message */
   let toastMsg='✅ Sessão registrada!';
   if(rev){
-    toastMsg=_revAutoMarcada?'🔁 Revisão concluída automaticamente! ('+_revAutoMarcada.label+')':'🔁 Sessão de revisão registrada!';
-  } else if(concluido&&!jaTemRevisao){
-    agendarRevisoes(disc,sub,data);
-    toastMsg='🎯 Subtópico concluído! Revisões agendadas (+7, +30, +90 dias)';
-  } else if(concluido&&jaTemRevisao){
-    toastMsg='✅ Sessão registrada! (revisões já agendadas)';
-  } else if(msgFaltam){
-    toastMsg=`✅ Registrado! ${msgFaltam} para concluir e agendar.`;
+    toastMsg='🔁 '+(n>1?n+' sessões de revisão registradas!':'Sessão de revisão registrada!');
+  } else if(concluidos.length>0&&naoConc.length===0){
+    toastMsg=n>1?`🎯 ${concluidos.length} subtópico(s) concluído(s)! Revisões agendadas.`:'🎯 Subtópico concluído! Revisões agendadas (+7, +30, +90 dias)';
+  } else if(concluidos.length>0){
+    toastMsg=`🎯 ${concluidos.length} concluído(s), ${naoConc.length} em andamento. Revisões agendadas para os concluídos.`;
+  } else if(n>1){
+    toastMsg=`✅ ${n} sessões registradas!`;
   }
 
-  ['f-disc','f-sub'].forEach(id=>document.getElementById(id).value='');
+  /* Reset form */
+  document.getElementById('f-disc').value='';
   ['f-aulas','f-aulastotal','f-paginas','f-paginastotal','f-q','f-ac','f-obs'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-banca').value='';
   document.getElementById('f-data').value=hoje();
-  document.getElementById('f-sub').innerHTML='<option value="">Selecione a disciplina primeiro</option>';
+  /* Reset multi-sub */
+  _selectedSubs=[];
+  const wrap=document.getElementById('f-sub-wrap');
+  wrap.innerHTML='<div class="multisub-placeholder" id="f-sub-placeholder">Selecione a disciplina primeiro</div>';
+  document.getElementById('f-sub-tags').innerHTML='';
   document.getElementById('sub-info-box').style.display='none';
   const revEl=document.getElementById('f-rev');
   revEl.checked=false; document.getElementById('toggle-rev-label').classList.remove('checked');
