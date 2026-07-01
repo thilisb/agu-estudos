@@ -452,7 +452,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:1
     <div class="card-title">📊 Acerto Ponderado por Disciplina — Atual vs. Projetado</div>
     <div style="overflow-x:auto">
       <table class="disc-prob-table">
-        <thead><tr><th>Disciplina</th><th>Grupo</th><th>Questões</th><th>Peso %</th><th>Acerto Atual</th><th>Projetado</th><th>Pts Atuais</th><th>Pts Proj.</th></tr></thead>
+        <thead><tr><th>Disciplina</th><th>Grupo</th><th>Questões</th><th>Peso %</th><th>Acerto Atual</th><th>Cobertura</th><th>Horas rest.</th><th>Projetado</th><th>Pts Atuais</th><th>Pts Proj.</th></tr></thead>
         <tbody id="disc-prob-tbody"></tbody>
         <tfoot id="disc-prob-tfoot"></tfoot>
       </table>
@@ -462,7 +462,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:1
   <div class="card">
     <div class="card-title">🚀 Maiores Alavancas — onde focar para subir a nota</div>
     <div class="alavanca-list" id="prob-alavancas"></div>
-    <div class="prob-aviso">⚠️ Modelo calibrado com o edital AGU 2022 (Advogado da União, Cebraspe) e cruzado com os dados da PGFN 2022. A distribuição de questões por disciplina dentro de cada grupo é estimada com base na proporção histórica — o edital define apenas o total por grupo (I: 46q, II: 34q, III: 20q). Questões de estudo tendem a superestimar o acerto real em prova. Incerteza: ±10 pp.</div>
+    <div class="prob-aviso">⚠️ Modelo calibrado com o edital AGU 2022 (Advogado da União, Cebraspe) e cruzado com os dados da PGFN 2022. A distribuição de questões por disciplina dentro de cada grupo é estimada com base na proporção histórica — o edital define apenas o total por grupo (I: 46q, II: 34q, III: 20q). Horas restantes descontam o que você já estudou de fato em cada disciplina; teto de acerto recalibra pra cima se seu desempenho real superar o assumido; Grupo III usa um fator de cadência mais lento (estuda só a cada 2 domingos, fora do cronograma do curso). Questões de estudo tendem a superestimar o acerto real em prova. Incerteza: ±10 pp.</div>
   </div>
 </div>
 
@@ -1067,6 +1067,30 @@ function diasAte(iso){
 function sk(disc,sub){return(disc+'||'+sub).replace(/[^a-zA-Z0-9||]/g,'_');}
 function horasSessao(s){return s.aulas*0.5+(s.paginas||0)/25+(s.q||0)*(2/60);}
 
+/* ── Deduplicação de sessões conjuntas (multi-subtópico) ──
+   Quando uma sessão cobre vários subtópicos ao mesmo tempo, aulas/páginas são
+   creditadas em cada um dos registros (de propósito, pra progresso por subtema).
+   Mas isso NÃO pode ser somado várias vezes na hora de calcular tempo real
+   estudado (horas da semana, dashboard) — senão infla artificialmente. Questões
+   (q/ac) já vêm divididas entre os subtópicos e por isso somam certo sem dedup. */
+function dedupParaTempo(sessoes){
+  const vistos=new Set(), unicas=[];
+  sessoes.forEach(s=>{
+    if(!s.multi||s.multi.length<=1){ unicas.push(s); return; }
+    const key=s.data+'|'+s.multi.join('~')+'|'+s.aulas+'|'+(s.paginas||0)+'|'+(s.rev?1:0)+'|'+(s.banca||'');
+    if(!vistos.has(key)){ vistos.add(key); unicas.push(s); }
+  });
+  return unicas;
+}
+/* Horas reais estudadas num conjunto de sessões: aulas/páginas deduplicadas por
+   bloco conjunto + questões somadas normalmente (sem dedup, pois já vêm divididas). */
+function horasReais(sessoes){
+  const dedup=dedupParaTempo(sessoes);
+  const hAP=dedup.reduce((a,s)=>a+s.aulas*0.5+(s.paginas||0)/25,0);
+  const hQ=sessoes.reduce((a,s)=>a+(s.q||0)*(2/60),0);
+  return hAP+hQ;
+}
+
 function showToast(msg,tipo='ok'){
   const t=document.getElementById('toast');
   t.textContent=msg;
@@ -1170,7 +1194,7 @@ window.toggleRevLabel=function(){
 function avgRevMin(){
   const revs=window._d.sessoes.filter(s=>s.rev);
   if(revs.length===0)return 25;
-  return revs.reduce((a,s)=>a+horasSessao(s)*60,0)/revs.length;
+  return horasReais(revs)*60/revs.length;
 }
 function atrasadas(){
   return window._d.revisoes.filter(r=>!r.feita&&diasAte(r.data)<0);
@@ -1182,10 +1206,11 @@ function inicioSemana(){
 }
 function horasSemanaAtual(){
   const ini=inicioSemana();
-  return window._d.sessoes.filter(s=>{
+  const doSemana=window._d.sessoes.filter(s=>{
     const [y,m,dd]=s.data.split('-').map(Number);
     return new Date(y,m-1,dd) >= ini;
-  }).reduce((a,s)=>a+horasSessao(s),0);
+  });
+  return horasReais(doSemana);
 }
 function renderMeta(){
   const meta=window._d.metaSemanal||30;
@@ -1468,12 +1493,13 @@ window.importarJSON=async function(evt){
 
 
 function renderStats(){
-  const aulas=window._d.sessoes.reduce((a,s)=>a+s.aulas,0);
-  const paginas=window._d.sessoes.reduce((a,s)=>a+(s.paginas||0),0);
+  const dedupAll=dedupParaTempo(window._d.sessoes);
+  const aulas=dedupAll.reduce((a,s)=>a+s.aulas,0);
+  const paginas=dedupAll.reduce((a,s)=>a+(s.paginas||0),0);
   const questoes=window._d.sessoes.reduce((a,s)=>a+(s.q||0),0);
   const acertos=window._d.sessoes.reduce((a,s)=>a+(s.ac||0),0);
   const dias=new Set(window._d.sessoes.map(s=>s.data)).size;
-  const horas=window._d.sessoes.reduce((a,s)=>a+horasSessao(s),0);
+  const horas=horasReais(window._d.sessoes);
   document.getElementById('s-aulas').textContent=aulas;
   document.getElementById('s-paginas').textContent=paginas;
   document.getElementById('s-questoes').textContent=questoes;
@@ -1499,7 +1525,7 @@ function renderHistoricoDias(){
     dias.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'));
   }
   const metaDia=(window._d.metaSemanal||30)*60/7;
-  const minsPorDia=dias.map(iso=>window._d.sessoes.filter(s=>s.data===iso).reduce((a,s)=>a+horasSessao(s)*60,0));
+  const minsPorDia=dias.map(iso=>horasReais(window._d.sessoes.filter(s=>s.data===iso))*60);
   const maxV=Math.max(metaDia,...minsPorDia,10);
   const cont=document.getElementById('dash-semanas');
   cont.innerHTML=dias.map((iso,idx)=>{
@@ -1699,7 +1725,14 @@ const PROB_AGU = {
   curvaK:      1.20,  /* inclinação da curva logística                       */
 
   /* ── Corte eliminatório por grupo em pontos absolutos ── */
-  corteAbsPontos: { "I": 23, "II": 17, "III": 10 }
+  corteAbsPontos: { "I": 23, "II": 17, "III": 10 },
+
+  /* ── Fator de cadência por grupo: Grupo I/II seguem o cronograma do curso
+     (ritmo denso, quase diário). Grupo III avança só a cada 2 domingos, fora
+     do curso — mesmo com as mesmas horas totais previstas, a consistência é
+     bem menor, então descontamos parte do ganho por hora projetado.
+     É uma estimativa conservadora editável, não um dado medido. ── */
+  fatorRitmoGrupo: { "I": 1.0, "II": 1.0, "III": 0.6 }
 };
 
 /* ─── helpers ─────────────────────────────────────────────────────────────── */
@@ -1716,11 +1749,49 @@ function pAcertoDisc(disc, sessoes) {
   return peso * (totalAc / totalQ) + (1 - peso) * pri;
 }
 
-/* Acerto projetado ao fim do cronograma (modelo de curva de aprendizado) */
-function pAcertoProj(disc, atual) {
-  const h   = PROB_AGU.horasRestantes[disc] || 0;
-  const teto = PROB_AGU.teto[disc] || 0.76;
-  const k   = PROB_AGU.k;
+/* Horas já estudadas numa disciplina, com base nas sessões reais (deduplicadas
+   para sessões conjuntas — ver dedupParaTempo/horasReais). */
+function horasEstudadasDisc(disc, sessoes) {
+  return horasReais(sessoes.filter(s => s.disc === disc && !s.rev));
+}
+
+/* Horas restantes dinâmicas: parte do estimado original (PROB_AGU.horasRestantes),
+   descontando o que você já estudou de verdade nessa disciplina. Isso faz a
+   projeção reagir ao seu progresso real em vez de ficar travada num número fixo. */
+function horasRestantesDinamico(disc, sessoes) {
+  const base = PROB_AGU.horasRestantes[disc] || 0;
+  const gastas = horasEstudadasDisc(disc, sessoes);
+  return Math.max(0, base - gastas);
+}
+
+/* Cobertura de conteúdo: % dos subtópicos do edital, dentro de uma disciplina,
+   que já foram concluídos (total definido e atingido). Serve para avisar quando
+   um acerto alto está baseado em pouco conteúdo já visto, não em toda a matéria. */
+function coberturaDisc(disc, sessoes) {
+  const subs = (DISC[disc] && DISC[disc].subs) || [];
+  if (subs.length === 0) return 1;
+  let concluidos = 0;
+  subs.forEach(sub => {
+    const key = sk(disc, sub);
+    const totalA = window._d.subTotais[key] || 0;
+    const totalP = window._d.subTotaisPaginas ? (window._d.subTotaisPaginas[key] || 0) : 0;
+    if (totalA === 0 && totalP === 0) return;
+    const feitasA = sessoes.filter(s => s.disc === disc && s.sub === sub && !s.rev).reduce((a,s) => a+s.aulas, 0);
+    const feitasP = sessoes.filter(s => s.disc === disc && s.sub === sub && !s.rev).reduce((a,s) => a+(s.paginas||0), 0);
+    if ((totalA > 0 && feitasA >= totalA) || (totalP > 0 && feitasP >= totalP)) concluidos++;
+  });
+  return concluidos / subs.length;
+}
+
+/* Acerto projetado ao fim do cronograma (modelo de curva de aprendizado).
+   - Horas restantes agora são dinâmicas (descontam o que já foi estudado).
+   - Teto recalibra pra cima se o acerto já observado superar o teto assumido.
+   - Grupo III tem fator de cadência menor (estuda esparsamente, fora do curso). */
+function pAcertoProj(disc, atual, sessoes) {
+  const h    = horasRestantesDinamico(disc, sessoes || []);
+  const teto = Math.max(PROB_AGU.teto[disc] || 0.76, atual);
+  const g    = PROB_AGU.grupo[disc] || "I";
+  const k    = PROB_AGU.k * (PROB_AGU.fatorRitmoGrupo[g] || 1);
   return Math.min(teto, atual + (teto - atual) * (1 - Math.exp(-k * h)));
 }
 
@@ -1812,7 +1883,7 @@ window.renderProbabilidade = function() {
   const acAtual = {}, acProj = {};
   DNAMES.forEach(d => {
     acAtual[d] = pAcertoDisc(d, sessoes);
-    acProj[d]  = pAcertoProj(d, acAtual[d]);
+    acProj[d]  = pAcertoProj(d, acAtual[d], sessoes);
   });
 
   /* 2. Nota total atual e projetada */
@@ -1892,12 +1963,27 @@ window.renderProbabilidade = function() {
       const tagA    = pctA < corte
         ? '<span class="tag-corte">RISCO</span>'
         : '<span class="tag-ok">OK</span>';
+      /* amostra pequena de questões: acerto ainda puxado pro prior, pouca confiança */
+      const amostraPequena = qFeitas < PROB_AGU.minQ;
+      const subtextoAmostra = '<div style="font-size:.55rem;color:var(--muted);margin-top:1px">'
+        +(amostraPequena?'⚠️ ':'')+qFeitas+'q'+'</div>';
+      /* cobertura de conteúdo: % de subtópicos já concluídos nessa disciplina */
+      const cobPct = Math.round(coberturaDisc(d, sessoes) * 100);
+      const acertoAltoComPoucoConteudo = pctA >= 65 && cobPct < 30;
+      const corCob = cobPct >= 60 ? 'var(--success)' : cobPct >= 30 ? 'var(--accent)' : 'var(--warn)';
+      const cobHtml = cobPct+'%'+(acertoAltoComPoucoConteudo?'<div style="font-size:.55rem;color:var(--warn);margin-top:1px">⚠️ pouco conteúdo</div>':'');
+      /* horas restantes dinâmicas (descontam o que já foi estudado de verdade) */
+      const hRest = horasRestantesDinamico(d, sessoes);
+      const cadenciaLenta = (PROB_AGU.fatorRitmoGrupo[g]||1) < 1;
+      const hHtml = hRest.toFixed(0)+'h'+(cadenciaLenta?'<div style="font-size:.55rem;color:var(--muted);margin-top:1px">domingos alt.</div>':'');
       return '<tr'+(semDados?' style="opacity:.55"':'')+'>'
         +'<td>'+d+'</td>'
         +'<td style="color:var(--muted)">G-'+g+'</td>'
         +'<td style="color:var(--muted)">'+nqD+'</td>'
         +'<td style="color:var(--muted)">'+peso+'%</td>'
-        +'<td style="color:'+corA+';font-weight:600">'+pctA+'%'+tagA+'</td>'
+        +'<td style="color:'+corA+';font-weight:600">'+pctA+'%'+tagA+subtextoAmostra+'</td>'
+        +'<td style="color:'+corCob+'">'+cobHtml+'</td>'
+        +'<td style="color:var(--muted)">'+hHtml+'</td>'
         +'<td style="color:'+corP+';font-weight:600">'+pctP+'%</td>'
         +'<td style="color:'+corA+'">'+ptsA+'</td>'
         +'<td style="color:'+corP+'">'+ptsP+'</td>'
@@ -1908,35 +1994,40 @@ window.renderProbabilidade = function() {
       const ptsTotA = DNAMES.reduce((s,d)=>(s+acAtual[d]*(PROB_AGU.nq[d]||0)),0);
       const ptsTotP = DNAMES.reduce((s,d)=>(s+acProj[d]*(PROB_AGU.nq[d]||0)),0);
       tfoot.innerHTML = '<tr style="font-weight:700;border-top:2px solid var(--border)">'
-        +'<td colspan="6" style="color:var(--muted)">TOTAL ESTIMADO</td>'
+        +'<td colspan="8" style="color:var(--muted)">TOTAL ESTIMADO</td>'
         +'<td style="color:var(--accent)">'+ptsTotA.toFixed(1)+' pts</td>'
         +'<td style="color:var(--success)">'+ptsTotP.toFixed(1)+' pts</td>'
         +'</tr>';
     }
   }
 
-  /* 9. Alavancas — disciplinas que mais aumentam a prob se melhoradas */
+  /* 9. Alavancas — disciplinas com melhor retorno por hora de estudo restante,
+     não só o ganho absoluto (uma disciplina que exige poucas horas pra fechar
+     o gap vale mais o foco do que uma que ganha mais pontos mas custa 3x mais tempo) */
   const alavEl = document.getElementById('prob-alavancas');
   if (alavEl) {
     const ganhos = DNAMES.map(d => {
       const acSim = Object.assign({}, acAtual, { [d]: acProj[d] });
       const pSim  = pPassar2Fase(acSim);
-      const gainPP = Math.round((pSim - probAtual) * 100);
-      const gainPts = ((acProj[d] - acAtual[d]) * (PROB_AGU.nq[d]||0)).toFixed(2);
-      return { d, gainPP, gainPts, g: PROB_AGU.grupo[d] || '?' };
-    }).sort((a, b) => b.gainPP - a.gainPP);
+      const gainPP = (pSim - probAtual) * 100;
+      const gainPts = (acProj[d] - acAtual[d]) * (PROB_AGU.nq[d]||0);
+      const hRest = horasRestantesDinamico(d, sessoes);
+      const eficiencia = hRest > 0.5 ? gainPP / hRest : gainPP; /* pp de ganho por hora */
+      return { d, gainPP, gainPts: gainPts.toFixed(2), hRest, eficiencia, g: PROB_AGU.grupo[d] || '?' };
+    }).sort((a, b) => b.eficiencia - a.eficiencia);
 
     alavEl.innerHTML = ganhos.slice(0,6).map((g, i) => {
-      const barW = Math.min(100, Math.abs(g.gainPP) * 2.5);
+      const barW = Math.min(100, Math.abs(g.eficiencia) * 40);
       const cor  = i===0 ? 'var(--danger)' : i===1 ? '#e07a30' : 'var(--accent)';
       return '<div class="alavanca-item">'
         +'<div style="flex:1">'
           +'<div class="alavanca-disc">'+(i+1)+'. '+g.d
             +' <span style="color:var(--muted);font-size:.58rem">(G-'+g.g+')</span></div>'
-          +'<div class="alavanca-sub">Ganho de +'+g.gainPts+' pts na nota total</div>'
+          +'<div class="alavanca-sub">+'+g.gainPts+' pts na nota · '+g.hRest.toFixed(0)+'h restantes</div>'
         +'</div>'
         +'<div style="text-align:right;flex-shrink:0">'
-          +'<div class="alavanca-gain" style="color:'+cor+'">+'+(g.gainPP>0?g.gainPP:'<1')+' pp</div>'
+          +'<div class="alavanca-gain" style="color:'+cor+'">+'+(g.gainPP>=1?Math.round(g.gainPP):'<1')+' pp</div>'
+          +'<div style="font-size:.55rem;color:var(--muted)">'+g.eficiencia.toFixed(2)+' pp/h</div>'
           +'<div class="alavanca-bar"><div style="height:5px;background:var(--border);border-radius:99px;overflow:hidden;margin-top:4px"><div style="height:100%;width:'+barW+'%;background:'+cor+';border-radius:99px"></div></div></div>'
         +'</div>'
         +'</div>';
