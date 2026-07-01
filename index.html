@@ -327,10 +327,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:1
         <div id="sub-info-content" style="background:var(--surface3);border:1px solid var(--border2);border-radius:var(--radius-xs);padding:10px 12px;font-size:.7rem;color:var(--text2);line-height:1.7;"></div>
       </div>
       <div class="field"><label>Aulas assistidas <span style="color:var(--muted);font-size:.55rem">(vale p/ cada subtópico marcado)</span></label><input type="number" id="f-aulas" min="0" placeholder="0"></div>
-      <div class="field"><label>Total de aulas <span style="color:var(--accent);font-size:.55rem">★ se vídeo — só com 1 subtópico</span></label><input type="number" id="f-aulastotal" min="0" placeholder="Branco se já informou"></div>
+      <div class="field"><label>Total de aulas <span style="color:var(--accent);font-size:.55rem">★ se vídeo — aplica a todos marcados</span></label><input type="number" id="f-aulastotal" min="0" placeholder="Branco se já informou"></div>
       <div class="field"><label>Páginas lidas <span style="color:var(--muted);font-size:.55rem">(25 págs = 1h | 1q = 2m)</span></label><input type="number" id="f-paginas" min="0" placeholder="0"></div>
-      <div class="field"><label>Total de páginas <span style="color:var(--accent);font-size:.55rem">★ se PDF/livro — só com 1 subtópico</span></label><input type="number" id="f-paginastotal" min="0" placeholder="Branco se já informou"></div>
-      <div class="field"><label>Questões feitas <span style="color:var(--muted);font-size:.55rem">(total da sessão, não por subtópico)</span></label><input type="number" id="f-q" min="0" placeholder="0"></div>
+      <div class="field"><label>Total de páginas <span style="color:var(--accent);font-size:.55rem">★ se PDF/livro — aplica a todos marcados</span></label><input type="number" id="f-paginastotal" min="0" placeholder="Branco se já informou"></div>
+      <div class="field"><label>Questões feitas <span style="color:var(--muted);font-size:.55rem">(dividido entre os subtópicos marcados)</span></label><input type="number" id="f-q" min="0" placeholder="0"></div>
       <div class="field"><label>Questões corretas</label><input type="number" id="f-ac" min="0" placeholder="0"></div>
       <div class="field"><label>Banca da questão</label>
         <select id="f-banca">
@@ -1127,15 +1127,8 @@ window.mostrarInfoSub=function(){
   const fPagsTotal=document.getElementById('f-paginastotal');
   if(!disc||subs.length===0){
     box.style.display='none';
-    fAulasTotal.disabled=false; fPagsTotal.disabled=false;
     fAulasTotal.placeholder='Branco se já informou'; fPagsTotal.placeholder='Branco se já informou';
     return;
-  }
-  if(subs.length>1){
-    fAulasTotal.disabled=true; fAulasTotal.value=''; fAulasTotal.placeholder='Desative: só com 1 subtópico';
-    fPagsTotal.disabled=true; fPagsTotal.value=''; fPagsTotal.placeholder='Desative: só com 1 subtópico';
-  } else {
-    fAulasTotal.disabled=false; fPagsTotal.disabled=false;
   }
   box.style.display='block';
   content.innerHTML=subs.map(sub=>{
@@ -1148,10 +1141,13 @@ window.mostrarInfoSub=function(){
     if(subs.length===1){
       fAulasTotal.placeholder=totalAulas>0?'Atual: '+totalAulas+' aul':'Branco se já informou';
       fPagsTotal.placeholder=totalPags>0?'Atual: '+totalPags+' pág':'Branco se já informou';
+    } else {
+      fAulasTotal.placeholder='Branco se já informou (aplica a todos marcados)';
+      fPagsTotal.placeholder='Branco se já informou (aplica a todos marcados)';
     }
     let statusHtml;
     if(aulasFeitas===0&&pagsFeitas===0&&totalAulas===0&&totalPags===0){
-      statusHtml='<span style="color:var(--muted)">○</span> <strong>Não iniciado</strong> — informe o total na 1ª sessão (com só este subtópico marcado).';
+      statusHtml='<span style="color:var(--muted)">○</span> <strong>Não iniciado</strong> — informe o total se souber (vale pra este subtópico).';
     } else if(totalAulas===0&&totalPags===0){
       statusHtml='<span style="color:var(--accent)">⚠️</span> <strong>Em andamento sem total</strong>. Informe o total para ativar as revisões.';
     } else if((totalAulas>0&&aulasFeitas>=totalAulas)||(totalPags>0&&pagsFeitas>=totalPags)){
@@ -1275,6 +1271,12 @@ function renderGrupos(){
 }
 
 
+function distribuirInteiro(total,n){
+  /* Distribui um inteiro em n partes o mais igual possível, sem perder nada por arredondamento. */
+  const base=Math.floor(total/n), rem=total-base*n;
+  return Array.from({length:n},(_,i)=>base+(i<rem?1:0));
+}
+
 window.registrarSessao=async function(){
   const data=document.getElementById('f-data').value||hoje();
   const disc=document.getElementById('f-disc').value;
@@ -1293,23 +1295,30 @@ window.registrarSessao=async function(){
   if(subs.length===0){showToast('Selecione ao menos um subtópico','err');return;}
   if(aulas===0&&q===0&&paginas===0){showToast('Informe aulas, páginas ou questões','err');return;}
   if(ac>q){showToast('Acertos > questões','err');return;}
-  if(subs.length>1&&(aulasTotal>0||paginasTotal>0)){showToast('Total de aulas/páginas só pode ser definido com 1 subtópico selecionado','err');return;}
 
-  /* Questões/acertos contam 1x por sessão (não por subtópico), pra não inflar
-     o total de questões da disciplina quando vários subtópicos são marcados juntos.
-     Aulas/páginas, por outro lado, valem para cada subtópico coberto no bloco. */
-  if(aulasTotal>0){ window._d.subTotais[sk(disc,subs[0])]=aulasTotal; delete window._d.subTotaisPaginas[sk(disc,subs[0])]; }
-  if(paginasTotal>0){ window._d.subTotaisPaginas[sk(disc,subs[0])]=paginasTotal; delete window._d.subTotais[sk(disc,subs[0])]; }
+  const n=subs.length;
+
+  /* Total de aulas/páginas: aplica-se a CADA subtópico marcado (é o total do curso
+     pra aquele subtema, não algo que se divide). */
+  if(aulasTotal>0){ subs.forEach(sub=>{ window._d.subTotais[sk(disc,sub)]=aulasTotal; delete window._d.subTotaisPaginas[sk(disc,sub)]; }); }
+  if(paginasTotal>0){ subs.forEach(sub=>{ window._d.subTotaisPaginas[sk(disc,sub)]=paginasTotal; delete window._d.subTotais[sk(disc,sub)]; }); }
+
+  /* Questões/acertos: divididos entre os subtópicos marcados (aproximação organizacional
+     — na prática as questões cruzam temas, mas isso dá uma referência de progresso por subtema
+     sem inflar o total da disciplina, já que a soma das partes = o total informado). */
+  const qPorSub=distribuirInteiro(q,n);
+  const acPorSubBruto=distribuirInteiro(ac,n);
+  const acPorSub=acPorSubBruto.map((a,i)=>Math.min(a,qPorSub[i]));
 
   let _revAutoMarcada=null;
   const detalhes=[];
   let algumConcluidoNovo=false;
 
   subs.forEach((sub,idx)=>{
-    const sessaoObj={id:Date.now()+idx,data,disc,sub,aulas,paginas,q:idx===0?q:0,ac:idx===0?ac:0,obs};
+    const sessaoObj={id:Date.now()+idx,data,disc,sub,aulas,paginas,q:qPorSub[idx],ac:acPorSub[idx],obs};
     if(rev) sessaoObj.rev=true;
     if(banca) sessaoObj.banca=banca;
-    if(subs.length>1) sessaoObj.multi=subs.slice();
+    if(n>1) sessaoObj.multi=subs.slice();
     window._d.sessoes.unshift(sessaoObj);
 
     if(rev){
@@ -1347,10 +1356,10 @@ window.registrarSessao=async function(){
   let toastMsg;
   if(rev){
     toastMsg=_revAutoMarcada?'🔁 Revisão concluída automaticamente! ('+_revAutoMarcada.label+')':'🔁 Sessão de revisão registrada!';
-  } else if(subs.length===1){
+  } else if(n===1){
     toastMsg=algumConcluidoNovo?('🎯 '+detalhes[0]):('✅ '+detalhes[0]);
   } else {
-    toastMsg='✅ Sessão registrada em '+subs.length+' subtópicos!'+(algumConcluidoNovo?' 🎯 pelo menos 1 concluído.':'');
+    toastMsg='✅ Sessão registrada em '+n+' subtópicos ('+q+'q divididas)!'+(algumConcluidoNovo?' 🎯 pelo menos 1 concluído.':'');
   }
 
   ['f-disc'].forEach(id=>document.getElementById(id).value='');
@@ -1359,8 +1368,6 @@ window.registrarSessao=async function(){
   document.getElementById('f-data').value=hoje();
   document.getElementById('f-sub-list').innerHTML='<div style="font-size:.68rem;color:var(--muted);padding:10px 0">Selecione a disciplina primeiro</div>';
   document.getElementById('f-sub-count').textContent='';
-  document.getElementById('f-aulastotal').disabled=false;
-  document.getElementById('f-paginastotal').disabled=false;
   document.getElementById('sub-info-box').style.display='none';
   const revEl=document.getElementById('f-rev');
   revEl.checked=false; document.getElementById('toggle-rev-label').classList.remove('checked');
