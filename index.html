@@ -335,7 +335,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:1
       </div>
       <div class="field"><label>Aulas assistidas <span style="color:var(--muted);font-size:.55rem">(dividido entre os subtópicos marcados)</span></label><input type="number" id="f-aulas" min="0" placeholder="0"></div>
       <div class="field"><label>Total de aulas <span style="color:var(--accent);font-size:.55rem">★ se vídeo — aplica a todos marcados</span></label><input type="number" id="f-aulastotal" min="0" placeholder="Branco se já informou"></div>
-      <div class="field"><label>Páginas lidas <span style="color:var(--muted);font-size:.55rem">(dividido entre subtópicos · 25 págs=1h)</span></label><input type="number" id="f-paginas" min="0" placeholder="0"></div>
+      <div class="field"><label>Páginas lidas <span id="f-paginas-hint" style="color:var(--muted);font-size:.55rem">(dividido entre subtópicos · 25 págs=1h)</span></label><input type="number" id="f-paginas" min="0" placeholder="0"></div>
       <div class="field"><label>Total de páginas <span style="color:var(--accent);font-size:.55rem">★ se PDF/livro — aplica a todos marcados</span></label><input type="number" id="f-paginastotal" min="0" placeholder="Branco se já informou"></div>
       <div class="field"><label>Questões feitas <span style="color:var(--muted);font-size:.55rem">(dividido entre os subtópicos marcados)</span></label><input type="number" id="f-q" min="0" placeholder="0"></div>
       <div class="field"><label>Questões corretas</label><input type="number" id="f-ac" min="0" placeholder="0"></div>
@@ -1073,7 +1073,10 @@ function diasAte(iso){
   return Math.round((a-b)/86400000);
 }
 function sk(disc,sub){return(disc+'||'+sub).replace(/[^a-zA-Z0-9||]/g,'_');}
-function horasSessao(s){return s.aulas*0.5+(s.paginas||0)/25+(s.q||0)*(2/60);}
+function horasSessao(s){
+  const pagsPorHora=(s.disc===LEGISLACAO_DISC)?20:25;
+  return s.aulas*0.5+(s.paginas||0)/pagsPorHora+(s.q||0)*(2/60);
+}
 
 function showToast(msg,tipo='ok'){
   const t=document.getElementById('toast');
@@ -1083,12 +1086,21 @@ function showToast(msg,tipo='ok'){
   setTimeout(()=>t.classList.remove('show'),3200);
 }
 
+/* Lei seca: trilha separada de leitura de legislação, com ritmo mais lento
+   (20 páginas/h em vez de 25) e progresso independente por disciplina.
+   Os "subtópicos" aqui são as próprias disciplinas do edital. */
+const LEGISLACAO_DISC = 'Legislação (Lei Seca)';
+const LEGISLACAO_SUBS = DNAMES.slice();
+
 function popularTodosSelects(){
   ['f-disc','edit-disc'].forEach(id=>{
     const sel=document.getElementById(id);
     if(!sel)return;
     sel.innerHTML='<option value="">Selecione...</option>';
     DNAMES.forEach(d=>{const o=document.createElement('option');o.value=d;o.textContent=d;sel.appendChild(o);});
+    const opLeg=document.createElement('option');
+    opLeg.value=LEGISLACAO_DISC; opLeg.textContent='── '+LEGISLACAO_DISC+' ──';
+    sel.appendChild(opLeg);
   });
   document.getElementById('f-data').value=hoje();
 }
@@ -1098,13 +1110,17 @@ window.popularSubs=function(targetId,sourceId){
   if(targetId!=='f-sub'){
     const sel=document.getElementById(targetId);
     sel.innerHTML='<option value="">Selecione o subtópico</option>';
-    if(disc&&DISC[disc])DISC[disc].subs.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o);});
+    const listaSel=disc===LEGISLACAO_DISC?LEGISLACAO_SUBS:(disc&&DISC[disc]?DISC[disc].subs:null);
+    if(listaSel)listaSel.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o);});
     return;
   }
   const box=document.getElementById('f-sub-list');
   box.innerHTML='';
-  if(disc&&DISC[disc]){
-    DISC[disc].subs.forEach((s,i)=>{
+  const hintEl=document.getElementById('f-paginas-hint');
+  if(hintEl)hintEl.textContent=disc===LEGISLACAO_DISC?'(dividido entre subtópicos · 20 págs=1h — lei seca)':'(dividido entre subtópicos · 25 págs=1h)';
+  const lista=disc===LEGISLACAO_DISC?LEGISLACAO_SUBS:(disc&&DISC[disc]?DISC[disc].subs:null);
+  if(lista){
+    lista.forEach((s,i)=>{
       const lbl=document.createElement('label');
       lbl.className='sub-check-item';
       lbl.innerHTML='<input type="checkbox" value="'+s.replace(/"/g,'&quot;')+'" id="fsub_'+i+'" onchange="mostrarInfoSub()"><span>'+s+'</span>';
