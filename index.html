@@ -336,9 +336,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:1
         <div id="sub-info-content" style="background:var(--surface3);border:1px solid var(--border2);border-radius:var(--radius-xs);padding:10px 12px;font-size:.7rem;color:var(--text2);line-height:1.7;"></div>
       </div>
       <div class="field"><label>Aulas assistidas <span style="color:var(--muted);font-size:.55rem">(dividido entre os subtópicos marcados)</span></label><input type="number" id="f-aulas" min="0" placeholder="0"></div>
-      <div class="field"><label>Total de aulas <span style="color:var(--accent);font-size:.55rem">★ se vídeo — aplica a todos marcados</span></label><input type="number" id="f-aulastotal" min="0" placeholder="Branco se já informou"></div>
+      <div class="field"><label>Total de aulas <span style="color:var(--accent);font-size:.55rem">★ se vídeo — dividido entre marcados</span></label><input type="number" id="f-aulastotal" min="0" placeholder="Branco se já informou"></div>
       <div class="field"><label>Páginas lidas <span id="f-paginas-hint" style="color:var(--muted);font-size:.55rem">(dividido entre subtópicos · 25 págs=1h)</span></label><input type="number" id="f-paginas" min="0" placeholder="0"></div>
-      <div class="field"><label>Total de páginas <span style="color:var(--accent);font-size:.55rem">★ se PDF/livro — aplica a todos marcados</span></label><input type="number" id="f-paginastotal" min="0" placeholder="Branco se já informou"></div>
+      <div class="field"><label>Total de páginas <span style="color:var(--accent);font-size:.55rem">★ se PDF/livro — dividido entre marcados</span></label><input type="number" id="f-paginastotal" min="0" placeholder="Branco se já informou"></div>
       <div class="field"><label>Questões feitas <span style="color:var(--muted);font-size:.55rem">(dividido entre os subtópicos marcados)</span></label><input type="number" id="f-q" min="0" placeholder="0"></div>
       <div class="field"><label>Questões corretas</label><input type="number" id="f-ac" min="0" placeholder="0"></div>
       <div class="field"><label>Banca da questão</label>
@@ -1211,8 +1211,8 @@ window.mostrarInfoSub=function(){
       fAulasTotal.placeholder=totalAulas>0?'Atual: '+totalAulas+' aul':'Branco se já informou';
       fPagsTotal.placeholder=totalPags>0?'Atual: '+totalPags+' pág':'Branco se já informou';
     } else {
-      fAulasTotal.placeholder='Branco se já informou (aplica a todos marcados)';
-      fPagsTotal.placeholder='Branco se já informou (aplica a todos marcados)';
+      fAulasTotal.placeholder='Branco se já informou (dividido entre marcados)';
+      fPagsTotal.placeholder='Branco se já informou (dividido entre marcados)';
     }
     let statusHtml;
     if(aulasFeitas===0&&pagsFeitas===0&&totalAulas===0&&totalPags===0){
@@ -1391,10 +1391,17 @@ window.registrarSessao=async function(){
 
   const n=subs.length;
 
-  /* Total de aulas/páginas: aplica-se a CADA subtópico marcado (é o total do curso
-     pra aquele subtema, não algo que se divide). */
-  if(aulasTotal>0){ subs.forEach(sub=>{ window._d.subTotais[sk(disc,sub)]=aulasTotal; delete window._d.subTotaisPaginas[sk(disc,sub)]; }); }
-  if(paginasTotal>0){ subs.forEach(sub=>{ window._d.subTotaisPaginas[sk(disc,sub)]=paginasTotal; delete window._d.subTotais[sk(disc,sub)]; }); }
+  /* Total de aulas/páginas: dividido entre os subtópicos marcados, igual às aulas/páginas
+     lidas. Se o material de 100 páginas cobre 2 subtemas, o total de cada um é 50 — não
+     100 —, senão o total fica maior que a realidade do material e nunca fecha 100%. */
+  if(aulasTotal>0){
+    const totAulasPorSub=distribuirInteiro(aulasTotal,n);
+    subs.forEach((sub,i)=>{ window._d.subTotais[sk(disc,sub)]=totAulasPorSub[i]; delete window._d.subTotaisPaginas[sk(disc,sub)]; });
+  }
+  if(paginasTotal>0){
+    const totPagsPorSub=distribuirInteiro(paginasTotal,n);
+    subs.forEach((sub,i)=>{ window._d.subTotaisPaginas[sk(disc,sub)]=totPagsPorSub[i]; delete window._d.subTotais[sk(disc,sub)]; });
+  }
 
   /* Aulas, páginas, questões e acertos: TODOS divididos entre os subtópicos marcados.
      Se você leu 90 páginas cobrindo 2 subtemas, cada um recebe 45 — não 90 —, senão
