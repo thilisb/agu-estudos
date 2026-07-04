@@ -55,6 +55,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:1
 .nav-actions{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;}
 .btn-nav{border-radius:99px;font-family:var(--mono);font-size:.58rem;padding:4px 10px;cursor:pointer;border:1px solid;transition:opacity .15s;}
 .btn-nav:hover{opacity:.75;}
+.btn-edital{background:var(--accent-glow);color:var(--accent);border-color:rgba(90,169,214,.35);}
 .btn-export{background:var(--success-bg);color:var(--success);border-color:rgba(74,174,110,.3);}
 .btn-import-label{background:var(--surface2);color:var(--muted);border-color:var(--border2);cursor:pointer;}
 .btn-logout{background:var(--danger-bg);color:var(--danger);border-color:rgba(224,82,82,.3);}
@@ -247,6 +248,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:1
     <div class="nav-right">
       <div class="nav-user" id="navUser"></div>
       <div class="nav-actions">
+        <button class="btn-nav btn-edital" onclick="gerarRelatorioEdital()">📋 Edital</button>
         <button class="btn-nav btn-export" onclick="exportarJSON()">⬇ Export</button>
         <label class="btn-nav btn-import-label">⬆ Import<input type="file" accept=".json" onchange="importarJSON(event)" style="display:none"></label>
         <button class="btn-nav btn-logout" onclick="logout()">Sair</button>
@@ -1059,6 +1061,50 @@ function totalEstimadoGeral(){
   let tF=0,tT=0;
   DNAMES.forEach(n=>{ const p=calculoProgressoUnificado(n); tF+=p.feito; tT+=p.total; });
   return {feito:tF,total:tT||1};
+}
+
+/* ── Auxiliares do Relatório do Edital ── */
+function statusSub(disc, sub){
+  const key=sk(disc,sub);
+  const totalAulas=window._d.subTotais[key]||0;
+  const totalPags=window._d.subTotaisPaginas?window._d.subTotaisPaginas[key]||0:0;
+  const aulasFeitas=window._d.sessoes.filter(s=>s.disc===disc&&s.sub===sub&&!s.rev).reduce((a,s)=>a+s.aulas,0);
+  const pagsFeitas=window._d.sessoes.filter(s=>s.disc===disc&&s.sub===sub&&!s.rev).reduce((a,s)=>a+(s.paginas||0),0);
+
+  if(aulasFeitas===0 && pagsFeitas===0) return {tipo:'none', label:'○ não iniciado', pct:0};
+  if(totalAulas===0 && totalPags===0) return {tipo:'notdef', label:'⚠️ sem total', pct:0};
+
+  if(totalAulas>0){
+    if(aulasFeitas>=totalAulas) return {tipo:'ok', label:'✅ concluído', pct:100};
+    return {tipo:'warn', label:'⏳ '+aulasFeitas+'/'+totalAulas+' a.', pct:(aulasFeitas/totalAulas)*100};
+  }
+  if(totalPags>0){
+    if(pagsFeitas>=totalPags) return {tipo:'ok', label:'✅ concluído', pct:100};
+    return {tipo:'warn', label:'⏳ '+pagsFeitas+'/'+totalPags+' p.', pct:(pagsFeitas/totalPags)*100};
+  }
+}
+function sessoesEstudo(disc, sub){
+  return window._d.sessoes.filter(s=>s.disc===disc&&s.sub===sub&&!s.rev);
+}
+function sessoesRevisao(disc, sub){
+  return window._d.sessoes.filter(s=>s.disc===disc&&s.sub===sub&&s.rev);
+}
+function acertoSessoes(list){
+  const q=list.reduce((a,s)=>a+(s.q||0),0);
+  const ac=list.reduce((a,s)=>a+(s.ac||0),0);
+  return q>0?{pct:Math.round(ac/q*100),q,ac}:null;
+}
+function acertoDiscSplit(disc){
+  const subs=DISC[disc]?DISC[disc].subs:[];
+  let qEst=0,acEst=0,qRev=0,acRev=0;
+  subs.forEach(sub=>{
+    sessoesEstudo(disc,sub).forEach(s=>{qEst+=(s.q||0);acEst+=(s.ac||0);});
+    sessoesRevisao(disc,sub).forEach(s=>{qRev+=(s.q||0);acRev+=(s.ac||0);});
+  });
+  return {
+    estudo: qEst>0?{pct:Math.round(acEst/qEst*100),q:qEst,ac:acEst}:null,
+    revisao: qRev>0?{pct:Math.round(acRev/qRev*100),q:qRev,ac:acRev}:null
+  };
 }
 
 window._d={sessoes:[],revisoes:[],subTotais:{},subTotaisPaginas:{},metaSemanal:30};
@@ -2111,6 +2157,214 @@ window.renderProbabilidade = function() {
         +'</div>';
     }).join('');
   }
+};
+
+// ── Gerador do Relatório do Edital ──
+window.gerarRelatorioEdital = function(){
+  const d=window._d;
+  const gerado=new Date().toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+
+  let totalQ=0,totalAc=0,totalQRev=0,totalAcRev=0,subsConcluidos=0,totalSubs=0;
+  DNAMES.forEach(nome=>{
+    DISC[nome].subs.forEach(sub=>{
+      totalSubs++;
+      const qEst=d.sessoes.filter(s=>s.disc===nome&&s.sub===sub&&!s.rev).reduce((a,s)=>a+(s.q||0),0);
+      const acEst=d.sessoes.filter(s=>s.disc===nome&&s.sub===sub&&!s.rev).reduce((a,s)=>a+(s.ac||0),0);
+      const qRev=d.sessoes.filter(s=>s.disc===nome&&s.sub===sub&&s.rev).reduce((a,s)=>a+(s.q||0),0);
+      const acRev=d.sessoes.filter(s=>s.disc===nome&&s.sub===sub&&s.rev).reduce((a,s)=>a+(s.ac||0),0);
+      totalQ+=qEst; totalAc+=acEst;
+      totalQRev+=qRev; totalAcRev+=acRev;
+      const st=statusSub(nome,sub);
+      if(st.tipo==='ok')subsConcluidos++;
+    });
+  });
+  const acertoGeral=totalQ>0?Math.round(totalAc/totalQ*100):0;
+  const progGeral=totalEstimadoGeral();
+  const progPct=Math.round((progGeral.feito/progGeral.total)*100);
+
+  /* AGU usa grupos eliminatórios (I/II/III, corte 50% cada) em vez de níveis de
+     prioridade — cada grupo tem seu próprio corte, então tratamos como categorias
+     de mesmo peso (nenhuma é "menos importante", cada uma pode te eliminar sozinha). */
+  const corGrupo={"I":"#5aa9d6","II":"#86c4e8","III":"#e07a52"};
+  const nomeGrupo={"I":"GRUPO I","II":"GRUPO II","III":"GRUPO III"};
+
+  function secaoDisc(nome){
+    const disc=DISC[nome];
+    const prog=calculoProgressoUnificado(nome);
+    const pct=Math.min(100,Math.round((prog.feito/prog.total)*100));
+
+    const scDisc={ok:0,warn:0,notdef:0,none:0};
+    disc.subs.forEach(sub=>{ const st=statusSub(nome,sub); scDisc[st.tipo]++; });
+    const totalSubsDisc=disc.subs.length;
+    const subsConclDiscStr=scDisc.ok+'/'+totalSubsDisc;
+    const corSubsConc=scDisc.ok===totalSubsDisc?'#4aae6e':scDisc.ok>0?'#e0a552':'#5a7080';
+
+    const splitDisc=acertoDiscSplit(nome);
+    const acEstDisc=splitDisc.estudo;
+    const acRevDisc=splitDisc.revisao;
+
+    const subsHTML=disc.subs.map(sub=>{
+      const st=statusSub(nome,sub);
+      const estSess=sessoesEstudo(nome,sub);
+      const revSess=sessoesRevisao(nome,sub);
+      const acEstSub=acertoSessoes(estSess);
+      const acRevSub=acertoSessoes(revSess);
+      const qS=(acEstSub?acEstSub.q:0)+(acRevSub?acRevSub.q:0);
+      const icone=st.tipo==='ok'?'✅':st.tipo==='warn'?'⏳':st.tipo==='notdef'?'⚠️':'○';
+      const corIcone=st.tipo==='ok'?'#4aae6e':st.tipo==='warn'?'#e0a552':st.tipo==='notdef'?'#e0a552':'#3a4a5a';
+      const bgRow=st.tipo==='ok'?'rgba(74,174,110,0.04)':st.tipo==='warn'?'rgba(224,165,82,0.04)':'transparent';
+      const corAcEst=acEstSub?(acEstSub.pct>=70?'#4aae6e':acEstSub.pct>=50?'#e0a552':'#e05252'):'#888';
+      const corAcRev=acRevSub?(acRevSub.pct>=70?'#4aae6e':acRevSub.pct>=50?'#e0a552':'#e05252'):'#5a7080';
+      const progPctSub=Math.round(Math.min(100, st.pct||0));
+      const miniBar=st.tipo!=='none'?
+        '<div style="width:48px;height:3px;background:#1e2d3d;border-radius:99px;overflow:hidden;display:inline-block;vertical-align:middle;margin-left:4px">'+
+          '<div style="height:100%;width:'+progPctSub+'%;background:'+disc.cor+';border-radius:99px"></div>'+
+        '</div>':'';
+      const acEstStr=acEstSub?'<span style="color:'+corAcEst+';font-weight:600">'+acEstSub.pct+'%</span><span style="color:#5a7080;font-size:10px"> ('+acEstSub.q+'q)</span>':'<span style="color:#5a7080">—</span>';
+      const acRevStr=acRevSub?'<span style="color:'+corAcRev+';font-weight:600">🔁 '+acRevSub.pct+'%</span><span style="color:#5a7080;font-size:10px"> ('+acRevSub.q+'q)</span>':'';
+      return '<tr style="border-bottom:1px solid #1a2530;background:'+bgRow+'">'+
+        '<td style="padding:7px 10px;color:'+corIcone+';font-size:14px;width:28px;text-align:center">'+icone+'</td>'+
+        '<td style="padding:7px 10px;font-size:13px;color:#dde6f0">'+sub+'</td>'+
+        '<td style="padding:7px 14px;text-align:center;font-size:12px;white-space:nowrap">'+
+          '<span style="color:'+corIcone+';font-weight:600">'+st.label+'</span>'+miniBar+
+        '</td>'+
+        '<td style="padding:7px 10px;text-align:center;font-size:12px;color:#888">'+(qS>0?qS:'—')+'</td>'+
+        '<td style="padding:7px 10px;font-size:12px">'+acEstStr+(acRevStr?'<br>'+acRevStr:'')+'</td>'+
+      '</tr>';
+    }).join('');
+
+    const corAcEstDisc=acEstDisc?(acEstDisc.pct>=70?'#4aae6e':acEstDisc.pct>=50?'#e0a552':'#e05252'):'#5a7080';
+    const corAcRevDisc=acRevDisc?(acRevDisc.pct>=70?'#4aae6e':acRevDisc.pct>=50?'#e0a552':'#e05252'):'#5a7080';
+    const corG=corGrupo[disc.grupo]||'#5a7080';
+    return '<div style="margin-bottom:24px;border:1px solid #1e2d3d;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.3)">'+
+      '<div style="background:linear-gradient(135deg,#111820 0%,#182030 100%);padding:14px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1e2d3d">'+
+        '<div style="flex:1">'+
+          '<div style="font-family:Georgia,serif;font-size:1rem;font-weight:700;color:#5aa9d6;margin-bottom:6px">'+nome+'</div>'+
+          '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
+            '<span style="background:'+corG+'22;color:'+corG+';border:1px solid '+corG+'44;border-radius:99px;font-size:10px;padding:2px 8px;font-weight:700">'+(nomeGrupo[disc.grupo]||'—')+'</span>'+
+            '<span style="font-size:11px;color:#5a7080">Progresso: <strong style="color:#5aa9d6">'+pct+'%</strong></span>'+
+            '<span style="font-size:11px;color:#5a7080">Subtópicos: <strong style="color:'+corSubsConc+'">'+subsConclDiscStr+'</strong></span>'+
+          '</div>'+
+        '</div>'+
+        '<div style="text-align:right;min-width:100px">'+
+          (acEstDisc?
+            '<div style="font-size:1.3rem;font-weight:700;color:'+corAcEstDisc+'">'+acEstDisc.pct+'%</div>'+
+            '<div style="font-size:10px;color:#5a7080">1º estudo ('+acEstDisc.q+'q)</div>'+
+            (acRevDisc?
+              '<div style="font-size:.95rem;font-weight:700;color:'+corAcRevDisc+';margin-top:4px">🔁 '+acRevDisc.pct+'%</div>'+
+              '<div style="font-size:10px;color:#5a7080">revisões ('+acRevDisc.q+'q)</div>'
+            :'')
+          :'<div style="font-size:12px;color:#5a7080;line-height:1.6">sem questões<br>registradas</div>')+
+        '</div>'+
+      '</div>'+
+      '<div style="height:6px;background:#0d1520"><div style="height:100%;width:'+pct+'%;background:'+disc.cor+';transition:width .5s;box-shadow:0 0 8px '+disc.cor+'66"></div></div>'+
+      '<div style="background:#0a0e13">'+
+        '<table style="width:100%;border-collapse:collapse">'+
+          '<thead><tr style="background:#0f1922;border-bottom:1px solid #1e2d3d">'+
+            '<th style="padding:6px 10px;font-size:10px;color:#5a7080;text-align:left;width:28px;text-transform:uppercase;letter-spacing:.06em"></th>'+
+            '<th style="padding:6px 10px;font-size:10px;color:#5a7080;text-align:left;text-transform:uppercase;letter-spacing:.06em">Subtópico</th>'+
+            '<th style="padding:6px 10px;font-size:10px;color:#5a7080;text-align:center;text-transform:uppercase;letter-spacing:.06em">Status</th>'+
+            '<th style="padding:6px 10px;font-size:10px;color:#5a7080;text-align:center;width:55px;text-transform:uppercase;letter-spacing:.06em">Qs</th>'+
+            '<th style="padding:6px 10px;font-size:10px;color:#5a7080;text-align:left;width:140px;text-transform:uppercase;letter-spacing:.06em">Acerto (estudo / revisão)</th>'+
+          '</tr></thead>'+
+          '<tbody>'+subsHTML+'</tbody>'+
+        '</table>'+
+      '</div>'+
+    '</div>';
+  }
+
+  const htmlDiscs=DNAMES.map(nome=>secaoDisc(nome)).join('');
+  const acertoCorGeral=acertoGeral>=70?'#4aae6e':acertoGeral>=50?'#e0a552':'#e05252';
+  const subsConclPct=Math.round((subsConcluidos/totalSubs)*100);
+  const corSubsConclGeral=subsConcluidos===totalSubs?'#4aae6e':subsConcluidos>0?'#e0a552':'#5a7080';
+
+  const grupoConc={I:0,II:0,III:0};
+  const grupoTotal={I:0,II:0,III:0};
+  DNAMES.forEach(nome=>{
+    const g=DISC[nome].grupo;
+    DISC[nome].subs.forEach(sub=>{
+      grupoTotal[g]=(grupoTotal[g]||0)+1;
+      if(statusSub(nome,sub).tipo==='ok') grupoConc[g]=(grupoConc[g]||0)+1;
+    });
+  });
+
+  const html='<!DOCTYPE html><html lang="pt-BR"><head>'+
+    '<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">'+
+    '<title>Relatório Edital — AGU</title>'+
+    '<style>*{box-sizing:border-box;margin:0;padding:0}body{background:#0a0e13;color:#dde6f0;font-family:monospace;padding:20px 16px 60px;max-width:860px;margin:0 auto}@media print{body{padding:10px}.no-print{display:none}}</style>'+
+    '</head><body>'+
+    '<div style="text-align:center;margin-bottom:24px;padding:24px 24px 20px;background:linear-gradient(135deg,#111820 0%,#0f1c2e 100%);border:1px solid #1e2d3d;border-radius:14px">'+
+      '<div style="font-size:2.2rem;margin-bottom:8px">⚖️</div>'+
+      '<div style="font-family:Georgia,serif;font-size:1.6rem;font-weight:700;color:#5aa9d6;margin-bottom:2px">Conteúdo Programático — AGU</div>'+
+      '<div style="font-size:12px;color:#5a7080;margin-bottom:20px">Advogado da União · Cebraspe · Gerado em '+gerado+'</div>'+
+      (()=>{
+        const acRevGeral=totalQRev>0?Math.round(totalAcRev/totalQRev*100):null;
+        const corAcRevGeral=acRevGeral===null?'#5a7080':acRevGeral>=70?'#4aae6e':acRevGeral>=50?'#e0a552':'#e05252';
+        const gapEdital=acRevGeral!==null?acRevGeral-acertoGeral:null;
+        const gapCor=gapEdital===null?'#5a7080':gapEdital>=0?'#4aae6e':'#e05252';
+        const revFeitasEd=d.revisoes.filter(r=>r.feita).length;
+        const revPendEd=d.revisoes.filter(r=>!r.feita).length;
+        return '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px">'+
+          '<div style="background:#0a0e13;border:1px solid #1e2d3d;border-radius:8px;padding:12px">'+
+            '<div style="font-size:1.5rem;font-weight:700;color:#5aa9d6">'+progPct+'%</div>'+
+            '<div style="font-size:10px;color:#5a7080;margin-top:2px;text-transform:uppercase;letter-spacing:.06em">PROGRESSO</div></div>'+
+          '<div style="background:#0a0e13;border:1px solid #1e2d3d;border-radius:8px;padding:12px">'+
+            '<div style="font-size:1.5rem;font-weight:700;color:'+corSubsConclGeral+'">'+subsConcluidos+'<span style="font-size:.85rem;color:#5a7080">/'+totalSubs+'</span></div>'+
+            '<div style="font-size:10px;color:#5a7080;margin-top:2px;text-transform:uppercase;letter-spacing:.06em">SUBTÓPICOS CONC.</div></div>'+
+          '<div style="background:#0a0e13;border:1px solid #1e2d3d;border-radius:8px;padding:12px">'+
+            '<div style="font-size:1.5rem;font-weight:700;color:'+acertoCorGeral+'">'+(totalQ>0?acertoGeral+'%':'—')+'</div>'+
+            '<div style="font-size:10px;color:#5a7080;margin-top:2px;text-transform:uppercase;letter-spacing:.06em">ACERTO 1º ESTUDO</div></div>'+
+          '<div style="background:#0a0e13;border:1px solid #1e2d3d;border-radius:8px;padding:12px">'+
+            '<div style="font-size:1.5rem;font-weight:700;color:'+corAcRevGeral+'">'+(acRevGeral!==null?acRevGeral+'%':'—')+'</div>'+
+            '<div style="font-size:10px;color:#5a7080;margin-top:2px;text-transform:uppercase;letter-spacing:.06em">ACERTO REVISÕES</div></div>'+
+        '</div>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">'+
+          '<div style="background:#0a0e13;border:1px solid #1e2d3d;border-radius:8px;padding:10px;display:flex;align-items:center;justify-content:space-between">'+
+            '<span style="font-size:10px;color:#5a7080;text-transform:uppercase;letter-spacing:.06em">Δ revisão vs. 1º estudo</span>'+
+            '<span style="font-size:1rem;font-weight:700;color:'+gapCor+'">'+(gapEdital!==null?(gapEdital>=0?'+':'')+gapEdital+'pp':'—')+'</span>'+
+          '</div>'+
+          '<div style="background:#0a0e13;border:1px solid #1e2d3d;border-radius:8px;padding:10px;display:flex;align-items:center;justify-content:space-between">'+
+            '<span style="font-size:10px;color:#5a7080;text-transform:uppercase;letter-spacing:.06em">Revisões agendadas</span>'+
+            '<span style="font-size:.9rem;color:#a8bace"><strong style="color:#4aae6e">'+revFeitasEd+'</strong> feitas · <strong style="color:#e0a552">'+revPendEd+'</strong> pend.</span>'+
+          '</div>'+
+        '</div>';
+      })()
+      +
+      '<div style="background:#0a0e13;border:1px solid #1e2d3d;border-radius:8px;padding:12px 14px;margin-bottom:14px;text-align:left">'+
+        '<div style="font-size:10px;color:#5a7080;margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em">Subtópicos concluídos por grupo (corte eliminatório próprio: 50% cada)</div>'+
+        '<div style="display:flex;flex-direction:column;gap:6px">'+
+          ['I','II','III'].map(g=>{
+            const cor=corGrupo[g];
+            const c=grupoConc[g]||0;
+            const t=grupoTotal[g]||1;
+            const pPct=Math.round(c/t*100);
+            return '<div style="display:flex;align-items:center;gap:8px">'+
+              '<span style="font-size:10px;color:'+cor+';min-width:90px;font-weight:600">'+nomeGrupo[g]+'</span>'+
+              '<div style="flex:1;height:5px;background:#1e2d3d;border-radius:99px;overflow:hidden">'+
+                '<div style="height:100%;width:'+pPct+'%;background:'+cor+';border-radius:99px"></div>'+
+              '</div>'+
+              '<span style="font-size:10px;color:#a8bace;min-width:50px;text-align:right">'+c+'/'+t+' ('+pPct+'%)</span>'+
+            '</div>';
+          }).join('')+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+    '<div style="display:flex;gap:14px;flex-wrap:wrap;padding:10px 14px;background:#111820;border:1px solid #1e2d3d;border-radius:8px;margin-bottom:20px;font-size:11px;color:#a8bace">'+
+      '<span>✅ Concluído — revisões agendadas</span>'+
+      '<span>⏳ Em andamento</span>'+
+      '<span>⚠️ Estudado sem total definido</span>'+
+      '<span>○ Não iniciado</span>'+
+    '</div>'+
+    htmlDiscs+
+    '<div style="text-align:center;font-size:11px;color:#5a7080;margin-top:24px;padding-top:12px;border-top:1px solid #1e2d3d">'+
+      'AGU Painel de Estudos · '+gerado+
+    '</div></body></html>';
+
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  window.open(url,'_blank');
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+  showToast('📋 Relatório aberto em nova aba!');
 };
 
 popularTodosSelects();
