@@ -388,6 +388,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:1
     </div>
     <div id="prog-list"></div>
   </div>
+  <div class="card">
+    <div class="card-title">📖 Lei Seca — Leitura de Legislação</div>
+    <p style="font-size:.7rem;color:var(--muted);margin-bottom:12px;line-height:1.7">Acompanha só o quanto de cada lei já foi lido. Não entra no cálculo de cumprimento do cronograma nem na % geral de progresso — é uma trilha à parte, no seu próprio ritmo.</p>
+    <div id="prog-legislacao-resumo" style="font-size:.68rem;color:var(--text2);margin-bottom:10px"></div>
+    <div id="prog-legislacao-list"></div>
+  </div>
 </div>
 
 <div class="page" id="page-revisoes">
@@ -1692,6 +1698,37 @@ function renderProgresso(){
     return '<div class="disc-item" onclick="this.querySelector(\'.sub-list\').classList.toggle(\'open\')"><div class="disc-header"><div class="disc-name">'+nome+'</div><div class="disc-stats">'+pct+'%</div></div><div class="bar"><div class="bar-fill" style="width:'+pct+'%;background:'+DISC[nome].cor+'"></div></div><div class="sub-list">'+subsHtml+'</div></div>';
   }).join('');
 }
+/* Progresso de leitura da Lei Seca: trilha separada, fora do cronograma.
+   Cada "subtópico" aqui é uma disciplina do edital (LEGISLACAO_SUBS = DNAMES);
+   o que importa é só páginas lidas vs. total (se definido), sem entrar
+   no cálculo de % de cumprimento do cronograma nem no dash-disc principal. */
+function renderProgressoLegislacao(){
+  const cont=document.getElementById('prog-legislacao-list');
+  const resumoEl=document.getElementById('prog-legislacao-resumo');
+  if(!cont||!resumoEl) return;
+  let totalLidas=0, concluidas=0, comTotal=0;
+  const itemsHtml=LEGISLACAO_SUBS.map(nome=>{
+    const key=sk(LEGISLACAO_DISC,nome);
+    const tP=window._d.subTotaisPaginas[key]||0;
+    const pF=window._d.sessoes.filter(s=>s.disc===LEGISLACAO_DISC&&s.sub===nome&&!s.rev).reduce((a,s)=>a+(s.paginas||0),0);
+    totalLidas+=pF;
+    let statusCls='sub-status-none', statusTxt='○', label='não iniciado';
+    if(tP>0){
+      comTotal++;
+      const done=pF>=tP;
+      if(done) concluidas++;
+      statusCls=done?'sub-status-ok':'sub-status-warn';
+      statusTxt=done?'✅':'⏳';
+      label=pF+'/'+tP+' p.';
+    } else if(pF>0){
+      statusCls='sub-status-notdef'; statusTxt='⚠️'; label=pF+' p. (sem total)';
+    }
+    const pS=tP>0?Math.min(100,Math.round(pF/tP*100)):0;
+    return '<div class="sub-item"><span class="sub-status '+statusCls+'">'+statusTxt+'</span><span class="sub-name">'+nome+'</span><div class="sub-bw"><div class="sub-bar"><div class="sub-bar-fill" style="width:'+pS+'%;background:#7a7a9a"></div></div></div><span style="font-size:.6rem;color:var(--muted);min-width:66px;text-align:right;flex-shrink:0">'+label+'</span></div>';
+  }).join('');
+  resumoEl.textContent=totalLidas+' páginas lidas no total'+(comTotal>0?' · '+concluidas+'/'+comTotal+' leis concluídas (com total definido)':'');
+  cont.innerHTML=itemsHtml;
+}
 function renderRevisoes(){
   const p=window._d.revisoes.filter(r=>!r.feita).sort((a,b)=>a.data.localeCompare(b.data));
   const container=document.getElementById('rev-list');
@@ -1723,7 +1760,7 @@ function renderHistorico(filtro){
     return '<div class="hist-item'+(s.rev?' is-rev':'')+'"><div class="hist-top"><span class="hist-disc">'+s.disc+'</span><div style="display:flex;align-items:center;gap:6px">'+revBadge+'<span class="hist-date">'+fmtD(s.data)+'</span><button class="btn btn-sm btn-danger" onclick="deletarSessao('+s.id+')">✕</button></div></div><div class="hist-sub">'+s.sub+'</div>'+multiTag+'<div class="hist-nums">'+bancaBadge+'<span>'+s.aulas+'aul</span>'+(s.paginas?'<span>'+s.paginas+'págs</span>':'')+'<span>'+s.q+'q</span>'+(pct!==null?'<span class="'+cls+'">'+pct+'% ('+s.ac+'/'+s.q+')</span>':'')+(s.obs?'<span style="color:var(--muted)">📝 '+s.obs+'</span>':'')+'</div></div>';
   }).join('');
 }
-function render(){ renderStats(); renderDash(); renderProgresso(); renderRevisoes(); renderHistorico(histFiltro); }
+function render(){ renderStats(); renderDash(); renderProgresso(); renderProgressoLegislacao(); renderRevisoes(); renderHistorico(histFiltro); }
 window.showPage=function(id,btn){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.tab-nav').forEach(t=>t.classList.remove('active'));
