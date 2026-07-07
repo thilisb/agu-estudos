@@ -1483,7 +1483,8 @@ window.popularSubsEdit=function(){
   const disc=document.getElementById('edit-disc').value;
   const sel=document.getElementById('edit-sub');
   sel.innerHTML='<option value="">Selecione o subtópico</option>';
-  if(disc&&DISC[disc])DISC[disc].subs.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o);});
+  const listaSel=disc===LEGISLACAO_DISC?LEGISLACAO_SUBS:(disc&&DISC[disc]?DISC[disc].subs:null);
+  if(listaSel)listaSel.forEach(s=>{const o=document.createElement('option');o.value=s;o.textContent=s;sel.appendChild(o);});
   document.getElementById('edit-total-atual').style.display='none';
   document.getElementById('edit-total-fields').style.display='none';
   document.getElementById('edit-salvar-btn').style.display='none';
